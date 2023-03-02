@@ -12,6 +12,7 @@ namespace CsharpParser
     {
         private static string path = "";
         public static string buffer { get; set; }
+        public static string capsbuffer { get; set; }
         public static string [ ] lines { get; set; }
         public static List<String> testbuffer { get; set; } = new ( );
         public static int tbindex { get; set; }
@@ -21,7 +22,7 @@ namespace CsharpParser
 
         static void Main ( string [ ] args )
         {
-            string  filename ="",  srcchtext = "";
+            string  filename ="",  srcchtext = "", upperline="";
             path = @"C:\wpfmain\AllMethods.txt";
             if ( args . Length == 0 )
             {
@@ -33,189 +34,156 @@ namespace CsharpParser
                 filename = args [ 0 ] . Trim ( );
                 srcchtext = args [ 1 ] . Trim ( );
             }
-            try
-            {
-                buffer = File . ReadAllText ( filename );
-                lines = buffer . Split ( "\n" );
-                string lineend="", fulldeclaration="", procline="", arguments="";
-                bool found=false;
-                int type=-1;
-                int pointer = -1;
-                for ( int x = 0 ; x < lines . Length ; x++ )
-                {
-                    string entry = lines [ x ] . Trim ( ) . ToUpper ( );
+            buffer = File . ReadAllText ( filename );
+            capsbuffer = buffer . ToUpper ( );
+            lines = buffer . Split ( "\n" );
+            string procline="";
+            bool found=false;
+            int type=-1;
 
-                    Debug . WriteLine ( x ) ;
+            for ( int x = 0 ; x < lines . Length ; x++ )
+            {
+                try
+                {
+                    upperline = lines [ x ] . Trim ( ) . ToUpper ( );
+
+                    // condition has to FAIL to break;
+                    //           Debug . Assert ( x != 649, "reached lne 649" );
+
                     //************************//
                     // *** Main entry point  ***
                     //************************//
-                    if ( found == false && entry . Contains ( '(' ) )
+                    if ( found == false && upperline . Contains ( '(' ) )
                     {
+                        // Got the start of a procedure ?
                         if ( testbuffer != null )
                             testbuffer . Clear ( );
 
-                        if ( entry . StartsWith ( "PUBLIC" ) || entry . StartsWith ( "STATIC PUBLIC" ) )
+                        if ( ( upperline . StartsWith ( "PUBLIC" ) || upperline . StartsWith ( "STATIC PUBLIC" ) )
+                            || ( upperline . StartsWith ( "PRIVATE" ) || upperline . StartsWith ( "STATIC PRIVATE" ) )
+                            || ( upperline . StartsWith ( "INTERNAL" ) || upperline . StartsWith ( "STATIC INTERNAL" ) ) )
                         {
-                            lines[x] = StripFormattingChars ( lines [ x ] );
-                            type = 1;
-                            if ( lines [ x ] . Contains ( ")" ) )
+                            List<string>headerbuff  = new ();
+                            upperline = lines [ x ] . ToUpper ( );
+                            if ( upperline . Contains ( "(" ) && upperline . Contains ( ")\r" ) )
                             {
-                                // It's a one liner - process it
-                                testbuffer . Add (  lines [ x ] );
-                                writeArgs ( testbuffer, type );
+                                lines [ x ] = StripFormattingChars ( lines [ x ] . Trim ( ) );
+                                upperline = lines [ x ] . ToUpper ( );
+                                int a = upperline.IndexOf("(");
+                                AddProcRow ( $"\n{lines [ x ] . Substring ( 0, a ) . Trim ( )}", 1, true );
+                                int b = upperline.IndexOf(")");
+                                string argsonly = lines[x].Substring(++a, lines[x].Length -(a + 1) ).Trim() ;
+                                string []allargs = argsonly.Split(",");
+                                if ( allargs . Length > 1 )
+                                {
+                                    for ( int y = 0 ; y < allargs . Length ; y++ )
+                                    {
+                                        if ( y == allargs . Length - 1 )
+                                            AddProcRow ( $"{allargs [ y ]} )", 1, false );
+                                        else
+                                            AddProcRow ( $"{allargs [ y ]},", 1, false );
+                                    }
+                                }
+                                else
+                                {
+                                    if( allargs . Contains("(") && allargs . Contains ( ")" ) )
+                                        AddProcRow ( $"{allargs [ 0 ]} )", 1, false );
+                                }
                                 continue;
                             }
-                            else
-                            {
-                                tbindex = 0;
-                                // must  be a multiline declaration
-                                testbuffer . Add ( lines [ x ] );
-                                found = true;
-                                continue;
-                            }
-                        }
-                    }
-                    else if ( entry . StartsWith ( "PRIVATE" ) || entry . StartsWith ( "STATIC PRIVATE" ) )
-                    {
-                        lines [ x ] = StripFormattingChars ( lines [ x ] );
-                        type = 2;
-                        if ( lines [ x ] . Contains ( ")" ) )
-                        {
-                            // It's a one liner - process it
-                            testbuffer . Add ( lines [ x ] );
-                            writeArgs ( testbuffer, type );
                             continue;
                         }
-                        else
+                        if ( found == true )
                         {
-                            tbindex = 0;
-                            // must  be a multiline declaration
-                            testbuffer . Add ( lines [ x ] );
-                            found = true;
-                            continue;
-                        }
-                    }
-                    else if ( entry . StartsWith ( "INTERN" ) || entry . StartsWith ( "STATIC INTERN" ) )
-                    {
-                        lines [ x ] = StripFormattingChars ( lines [ x ] );
-                        type = 3;
-                        if ( lines [ x ] . Contains ( ")" ) )
-                        {
-                            // It's a one liner - process it
-                            testbuffer . Add ( lines [ x ] );
-                            writeArgs ( testbuffer, type );
-                            continue;
-                        }
-                        else
-                        {
-                            tbindex = 0;
-                            // must  be a multiline declaration
-                            testbuffer . Add ( lines [ x ] );
-                            found = true;
-                            continue;
-                        }
-                    }
-                    else if(found == false)
-                        continue;
-
-                    if ( found == true )
-                    {
-                        // handle the next line of args
-                        if ( lines [ x ] . IndexOf ( " )" ) >= 0 )
-                        {
-                            testbuffer . Add ( lines [ x ] );
-                            writeArgs ( testbuffer, type );
-                            found = false;
-                            continue;
-                        }
-                        else
-                        {
-                            testbuffer . Add ( lines [ x ] );
-                            continue;
-                        }
-                        if ( lines [ x ] . IndexOf ( "PUBLIC" ) >= 0 )
-                        {
-                            procline = lines [ x ] . Substring ( lines [ x ] . IndexOf ( "PUBLIC" ),
-                                lines [ x ] . IndexOf ( "(" ) );
-                            output_public . Append ( $"{lines [ x ]}\n" );
-                        }
-                        if ( lines [ x ] . IndexOf ( "PRIVATE" ) >= 0 )
-                        {
-                            procline = lines [ x ] . Substring ( lines [ x ] . IndexOf ( "PRIVATE" ),
-                                lines [ x ] . IndexOf ( "(" ) );
-                            output_public . Append ( $"{lines [ x ]}\n" );
-                        }
-                        if ( lines [ x ] . IndexOf ( "INTERNAL" ) >= 0 )
-                        {
-                            procline = lines [ x ] . Substring ( lines [ x ] . IndexOf ( "INTERNAL" ),
-                                lines [ x ] . IndexOf ( "(" ) );
-                            output_public . Append ( $"{lines [ x ]}\n" );
-                        }
-                    }
-
-                    if ( type != -1 )
-                    {
-                        // Now parse the argments out
-                        int indx = lines [x].IndexOf("(")+1;
-                        lineend = lines [ x ] . Substring ( indx );
-                        if ( lineend . Length > 0 && ( lineend . Contains ( "," ) ) )
-                        {
-                            string[] tmp1 = lineend.Split(",");
-                            writeArgs ( testbuffer, type );
-                        }
-                    }
-
-                    else if ( found == true )
-                    {
-                        if ( type == 1 )
-                            output_public . Append ( $"\n\t{lines [ x ]}" );
-                        else if ( type == 2 )
-                            output_private . Append ( $"\n\t{lines [ x ]}" );
-                        else if ( type == 3 )
-                            output_internal . Append ( $"\n\t{lines [ x ]}" );
-                        if ( entry . Contains ( ")" ) )
-                        {
-                            found = false;
-                            type = -1;
+                            //    // handle the next line of args
+                            //    if ( lines [ x ] . IndexOf ( " )" ) >= 0 )
+                            //    {
+                            //        lines [ x ] = StripFormattingChars ( lines [ x ] );
+                            //        testbuffer . Add ( $"{lines [ x ]}\n" );
+                            //        writeArgs ( testbuffer, type );
+                            //        found = false;
+                            //        continue;
+                            //    }
+                            //    else
+                            //    {
+                            //        lines [ x ] = StripFormattingChars ( lines [ x ] );
+                            //        testbuffer . Add ( lines [ x ] );
+                            //        continue;
+                            //    }
+                            //    if ( lines [ x ] . IndexOf ( "PUBLIC" ) >= 0 )
+                            //    {
+                            //        procline = lines [ x ] . Substring ( lines [ x ] . IndexOf ( "PUBLIC" ),
+                            //            lines [ x ] . IndexOf ( "(" ) );
+                            //        output_public . Append ( $"{lines [ x ]}" );
+                            //    }
+                            //    if ( lines [ x ] . IndexOf ( "PRIVATE" ) >= 0 )
+                            //    {
+                            //        procline = lines [ x ] . Substring ( lines [ x ] . IndexOf ( "PRIVATE" ),
+                            //            lines [ x ] . IndexOf ( "(" ) );
+                            //        output_private . Append ( $"{lines [ x ]}" );
+                            //    }
+                            //    if ( lines [ x ] . IndexOf ( "INTERNAL" ) >= 0 )
+                            //    {
+                            //        procline = lines [ x ] . Substring ( lines [ x ] . IndexOf ( "INTERNAL" ),
+                            //            lines [ x ] . IndexOf ( "(" ) );
+                            //        output_internal . Append ( $"{lines [ x ]}" );
+                            //    }
                         }
                     }
                 }
-                StringBuilder[] sb = CreateOutfile ( output_public, output_private, output_internal );
-                File . WriteAllText ( path, "\n\n PUBLIC METHODS\n" );
-                File . AppendAllText ( path, sb [ 0 ] . ToString ( ) );
-                if ( sb [ 1 ] != null )
+                catch ( Exception ex )
                 {
-                    File . AppendAllText ( path, "\n\n PRIVATE METHODS\n" );
-                    File . AppendAllText ( path, sb [ 1 ] . ToString ( ) );
+                    Debug . WriteLine ( $"Oooops : {ex . Message}" );
                 }
-                if ( sb [ 2 ] != null )
-                {
-                    File . AppendAllText ( path, "\n\n INTERNAL METHODS\n" );
-                    File . AppendAllText ( path, sb [ 2 ] . ToString ( ) );
-                }
-                Console . WriteLine ( $"All Methods parsed !!!!!" );
             }
-            catch ( Exception ex )
+
+
+            string underline="========================================================================================";
+            string sb = CreateOutfile ( output_public, output_private, output_internal );
+            File . WriteAllText ( path, filename );
+            File . WriteAllText ( path, $"{underline . Substring ( 0, filename . Length )}\n" );
+            File . AppendAllText ( path, sb );
+
+            Console . WriteLine ( $"All Methods parsed !!!!!" );
+        }
+        private static void AddProcRow ( string line, int type, bool IsFirst )
+        {
+            line = line . Trim ( );
+            if ( IsFirst )
             {
-                
-                Debug . WriteLine ( $"Oooops : {ex . Message}" );
+                //if(line.Contains(")"))
+                if ( type == 1 )
+                    output_public . Append ( $"{line} (\n" );
+                else if ( type == 2 )
+                    output_private . Append ( $"{line} (\n" );
+                else if ( type == 3 )
+                    output_internal . Append ( $"{line} (\n" );
+            }
+            else
+            {
+                //    line+=
+                if ( type == 1 )
+                    output_public . Append ( $"\t{line}\n" );
+                else if ( type == 2 )
+                    output_private . Append ( $"\t{line}\n" );
+                else if ( type == 3 )
+                    output_internal . Append ( $"\t{line}\n" );
+                if ( line . Contains ( ")" ) && type == 1 )
+                    output_public . Append ( $"\n" );
+                else if ( line . Contains ( ")" ) && type == 1 )
+                    output_private. Append ( $"\n" );
+                else if ( line . Contains ( ")" ) && type == 1 )
+                    output_internal. Append ( $"\n" );
             }
         }
 
-        private static string StripFormattingChars( string line)
+        private static string StripFormattingChars ( string line )
         {
             if ( line == null )
                 return "";
             while ( true )
             {
-                if ( line . StartsWith ( "\t" ))
-                    line = line . Substring ( 1 );
-                else
-                    break;
-            }
-            while ( true )
-            {
-                if ( line . StartsWith ( "\r" ))
+                if ( line . StartsWith ( "\t" ) )
                     line = line . Substring ( 1 );
                 else
                     break;
@@ -229,6 +197,13 @@ namespace CsharpParser
             }
             while ( true )
             {
+                if ( line . StartsWith ( "\r" ) )
+                    line = line . Substring ( 1 );
+                else
+                    break;
+            }
+            while ( true )
+            {
                 if ( line . EndsWith ( "\r" ) )
                     line = line . Substring ( 0, line . Length - 1 );
                 else
@@ -236,20 +211,40 @@ namespace CsharpParser
             }
             return line;
         }
-        private static StringBuilder [ ] CreateOutfile ( StringBuilder pub, StringBuilder priv, StringBuilder intern )
+        private static string CreateOutfile ( StringBuilder pub, StringBuilder priv, StringBuilder intern )
         {
-            StringBuilder[]  sbcollection =new StringBuilder [3];
+            string sbcollection = "";
             for ( int x = 0 ; x < pub . Length ; x++ )
             {
-                string entry = pub [ x ] .ToString(). Trim ( ) . ToUpper ( );
-                if ( entry . StartsWith ( "PUBLIC" ) )
-                    output_public . Append ( $"{pub [ x ]}\n" );
-                if ( entry . StartsWith ( "PRIVATE" ) )
-                    output_private . Append ( $"{pub [ x ]}\n" );
-                if ( entry . StartsWith ( "INTERNAL" ) )
-                    output_internal . Append ( $"{pub [ x ]}\n" );
+                if ( pub . Length > 0 )
+                {
+                    string entry = pub [ x ] .ToString(). Trim ( ) . ToUpper ( );
+                    if ( entry . ToUpper ( ) . StartsWith ( "PUBLIC" ) )
+                        output_public . Append ( $"{pub [ x ]}\n" );
+                }
             }
-            sbcollection [ 0 ] = output_public;
+            for ( int x = 0 ; x < priv . Length ; x++ )
+            {
+                if ( priv . Length > 0 )
+                {
+                    string entry = priv [ x ] . ToString ( ) . Trim ( ) . ToUpper ( );
+                    if ( entry . ToUpper ( ) . StartsWith ( "PRIVATE" ) )
+                        output_private . Append ( $"{priv [ x ]}\n" );
+                }
+            }
+            for ( int x = 0 ; x < intern . Length ; x++ )
+            {
+                if ( intern . Length > 0 )
+                {
+                    string entry = intern [ x ] . ToString ( ) . Trim ( ) . ToUpper ( );
+                    if ( entry . ToUpper ( ) . StartsWith ( "INTERNAL" ) )
+                        output_internal . Append ( $"{intern [ x ]}\n" );
+                }
+            }
+            sbcollection += output_public . ToString ( );
+            sbcollection += output_private . ToString ( );
+            sbcollection += output_public . ToString ( );
+            // return a string full of data
             return sbcollection;
         }
 
@@ -258,39 +253,27 @@ namespace CsharpParser
             string newliner = "\n";
             for ( int x = 0 ; x < data . Count ; x++ )
             {
-                if ( data [ x ] . StartsWith ( "\t" ) )
+                //if ( data [ x ] . StartsWith ( "\t" ) )
+                if ( x == 0 )
                 {
-                    // Strip out any leading tabs
-                    while ( true )
-                    {
-                        data [ x ] = data [ x ] . Substring ( 1 );
-                        if ( data [ x ] . StartsWith ( "\t" ) == false )
-                            break;
-                    }
-                    if ( data [ x ] . EndsWith ( "\r" ))
-                        data [ x ] = data [ x ] . Substring ( 0, data [ x ]. Length - 1 );
+                    if ( type == 1 )
+                        output_public . Append ( $"{data [ x ]}{newliner}\n" );
+                    else if ( type == 2 )
+                        output_private . Append ( $"{data [ x ]}{newliner}\n" );
+                    else if ( type == 3 )
+                        output_internal . Append ( $"{data [ x ]}{newliner}\n" );
                 }
-                //for ( int y = 0 ; y < data . Count ; y++ )
-                //{
-                    if ( x == 0 )
-                    {
-                        if ( type == 1 )
-                            output_public . Append ( $"{data [ x ]}{newliner}\n" );
-                        else if ( type == 2 )
-                            output_private . Append ( $"{data [ x ]}{newliner}\n" );
-                        else if ( type == 3 )
-                            output_internal . Append ( $"{data [ x ]}\n" );
-                    }
-                    else
-                    {
-                        if ( type == 1 )
-                            output_public . Append ( $"\t{data [ x ]}\n" );
-                        else if ( type == 2 )
-                            output_private . Append ( $"\t{data [ x ]}\n" );
-                        else if ( type == 3 )
-                            output_internal . Append ( $"\t{data [ x ]}\n" );
-                    }
+                else
+                {
+                    if ( type == 1 )
+                        output_public . Append ( $"\t{data [ x ]}\n" );
+                    else if ( type == 2 )
+                        output_private . Append ( $"\t{data [ x ]}\n" );
+                    else if ( type == 3 )
+                        output_internal . Append ( $"\t{data [ x ]}\n" );
+                }
                 //}
+
             }
         }
     }
