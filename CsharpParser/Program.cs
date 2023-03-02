@@ -69,6 +69,11 @@ namespace CsharpParser
                             {
                                 lines [ x ] = StripFormattingChars ( lines [ x ] . Trim ( ) );
                                 upperline = lines [ x ] . ToUpper ( );
+                                if ( ( lines [ x ] . Contains ( "(" ) && lines [ x ] . Contains ( ")" ) ) && lines [ x ] . Contains ( "," ) == false )
+                                {
+                                    AddProcRow ( $"{lines [ x ]}", 1, true, true );
+                                    continue;
+                                }
                                 int a = upperline.IndexOf("(");
                                 AddProcRow ( $"\n{lines [ x ] . Substring ( 0, a ) . Trim ( )}", 1, true );
                                 int b = upperline.IndexOf(")");
@@ -86,7 +91,7 @@ namespace CsharpParser
                                 }
                                 else
                                 {
-                                    if( allargs . Contains("(") && allargs . Contains ( ")" ) )
+                                    if ( allargs . Contains ( "(" ) && allargs . Contains ( ")" ) )
                                         AddProcRow ( $"{allargs [ 0 ]} )", 1, false );
                                 }
                                 continue;
@@ -146,18 +151,29 @@ namespace CsharpParser
 
             Console . WriteLine ( $"All Methods parsed !!!!!" );
         }
-        private static void AddProcRow ( string line, int type, bool IsFirst )
+        private static void AddProcRow ( string line, int type, bool IsFirst, bool isFull = false )
         {
             line = line . Trim ( );
+            if ( isFull )
+            {
+                if ( type == 1 )
+                    output_public . Append ( $"{line}\n\n" );
+                else if ( type == 2 )
+                    output_private . Append ( $"{line}\n\n" );
+                else if ( type == 3 )
+                    output_internal . Append ( $"{line}\n\n" );
+                return;
+            }
+
             if ( IsFirst )
             {
-                //if(line.Contains(")"))
                 if ( type == 1 )
                     output_public . Append ( $"{line} (\n" );
                 else if ( type == 2 )
                     output_private . Append ( $"{line} (\n" );
                 else if ( type == 3 )
                     output_internal . Append ( $"{line} (\n" );
+                return;
             }
             else
             {
@@ -171,9 +187,10 @@ namespace CsharpParser
                 if ( line . Contains ( ")" ) && type == 1 )
                     output_public . Append ( $"\n" );
                 else if ( line . Contains ( ")" ) && type == 1 )
-                    output_private. Append ( $"\n" );
+                    output_private . Append ( $"\n" );
                 else if ( line . Contains ( ")" ) && type == 1 )
-                    output_internal. Append ( $"\n" );
+                    output_internal . Append ( $"\n" );
+                return;
             }
         }
 
