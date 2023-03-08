@@ -1,342 +1,514 @@
-﻿using System . Diagnostics;
-using System . IO;
-using System . Text;
-using System;
-using System . Diagnostics . Tracing;
-using System . Reflection;
-using System . ComponentModel . Design;
-using System . Security . Cryptography . X509Certificates;
-using System . Collections;
-using System . Runtime . Versioning;
-using System . Xml . Linq;
-using System . Reflection . Metadata . Ecma335;
-using System . Linq;
-using System . Xml . Schema;
-using Microsoft . VisualBasic;
-using System . Threading . Channels;
+﻿using System . Collections . Generic;
+using System . ComponentModel;
 using System . Data;
+using System . Diagnostics;
+using System . Linq;
+using System . Reflection;
+using System . Runtime . CompilerServices;
+using System . Text;
+
+using SortSupportLib;
 
 namespace CsharpParser
 {
     #region declarations
     internal class Program
     {
-        private static int Alllinescount = 0;
-        private static int linescount = 0;
-        private static string path = "";
-        public static string buffer { get; set; }
-        public static string capsbuffer { get; set; }
-        public static string [ ] lines { get; set; }
-        public static string [ ] upperlines { get; set; }
-        public static string filename { get; set; } = "";
-        public static string [ ] rows { get; set; }
-        public static string? [ ] srcchtext { get; set; }
+        public static bool LOGFILENAMES = false;
+        public static bool SHOWASSERT = false;
 
-        public static string [ ] filesarray = new string [ 500 ];
+        public static int TotalFiles = 0;
+        public static int TotalLines = 0;
+        public static int TotalMethods = 0;
+        public static int TotalExErrors = 0;
+        public static int atch = 0;
+        public static int linescount = 0;
+        public static bool found = false;
+        public static string path = "";
+        public static string? searchpath;
+        public static string FullOutputLine = "";
+        public static List<string> FullfilesList { get; set; } = new List<string> ( );
+        public static List<string> FulldirectoriesList { get; set; } = new List<string> ( );
+        public static string? buffer { get; set; }
+        public static string filepath = "";
+        public static string searchfile = "";
+        public static string fname = "";
+        public static string [ ] DictResults = new string [ 2 ];
+        public static string? filespec { get; set; }
+        public static string? capsbuffer { get; set; }
+        public static string? CurrentFile { get; set; }
+        public static string [ ]? lines { get; set; }
+        public static string [ ]? upperlines { get; set; }
+        public static string pathfilename { get; set; } = "";
+        public static string [ ]? rows { get; set; }
+        public static string? [ ]? srcchtext { get; set; }
 
-        public static string underline = "========================================================================================";
+        public static List<string> FullPathFileNameList { get; set; } = new ( );
+        public static string [ ] AllFileNames = new string [ 1000 ];
+
+        public static int DirectoryCount { get; set; }
+        public static string underline = "==============================================================================================";
         public static List<String> testbuffer { get; set; } = new ( );
         public static Dictionary<string , string> AllMethods = new ( );
-        public static Dictionary<string , string> Errormethods = new ( );
+        //public static Dictionary<int , string> Errormethods = new ( );
+        public static Tuple<int , string? , string?>? tuple;
+        public static List<Tuple<int , string? , string?>>DebugErrors = new ( );
+        public static List<Tuple<int , string , string>> ErrorPaths = new ( );
+        public static List<Tuple<int , string , string>> AllValidEntries = new ( );
+
+        // declare tuple array (dummy size = 5000) !!
+        public static Tuple<int , string , string , string [ ]> [ ] Alltuples = new Tuple<int , string , string , string [ ]> [ 5000 ];
+        public static int AllProcsIindex = 0;
+
         public static int tbindex { get; set; }
         public static int errorindex { get; set; } = 0;
         public static StringBuilder output_public { get; set; } = new ( );
         public static StringBuilder output_internal { get; set; } = new ( );
         public static StringBuilder output_private { get; set; } = new ( );
-        public static string fname = "";
+
+        private static bool CreateIterativeReport = false;
 
         #endregion declarations
 
         static void Main ( string [ ] args )
         {
-            int filescount = 0;
-            IEnumerable<string> AllSourcefiles = null;
-            bool DOCONTINUE = false;
+            int TotalFiles = 0;
+            string [ ] arguments;
+            IEnumerable<string>? AllSourcefiles = null;
+            //            bool DOCONTINUE = false;
             string upperline = "";
-            for ( int x = 0 ; x < 500 ; x++ )
-            {
-                filesarray [ x ] = "";
-            }
+            bool IsDupe = false;
+            filespec = "*.cs";
+            //for ( int x = 0 ; x < 1000 ; x++ )
+            //{
+            //    AllFileNames [ x ] = "";
+            //}
             path = @"C:\wpfmain\Documentation\AllMethods.txt";
-            File . Delete ( path );
-            File . Delete ( $@"C:\wpfmain\documentation\AllOutput.txt" );
 
-            if ( args . Length == 0 )
+            #region setup
+            //***************************//
+            // Get user entry details
+            //***************************//
+            string DEFAULTPATH = @"C:\wpfmain\viewmodels";
+            Console . Write ( "Enter filename : " );
+            string? argstring = Console . ReadLine ( );
+            if ( argstring == "" )
             {
-                Console . Write ( "Enter filename : " );
-                filename = Console . ReadLine ( );
-                if ( filename == "2" )
-                {
-                    filename = filename = "C:\\Wpfmain\\utils2.cs";
-                    filesarray [ 0 ] = filename . Trim ( );
-                    filescount = 1;
-                }
-                else if ( filename == "1" )
-                {
-                    filename = "C:\\Wpfmain\\SProcsHandling.xaml.cs";
-                    filesarray [ 0 ] = filename . Trim ( );
-                    filescount = 1;
-                }
+                pathfilename = DEFAULTPATH;
+                searchfile = GetFilenameFromPath ( pathfilename . Trim ( ) , out filepath );
+                argstring = DEFAULTPATH;
+                TotalFiles = DoSetup ( argstring );
+            }
+            else if ( argstring . Contains ( "1" ) )
+            {
+                pathfilename = "C:\\Wpfmain\\SProcsHandling.xaml.cs";
+                searchfile = GetFilenameFromPath ( pathfilename . Trim ( ) , out filepath );
+                AllFileNames [ 0 ] = searchfile;
+                FullPathFileNameList . Add ( pathfilename );
+                searchpath = filepath;
+                TotalFiles = 1;
+                if ( LOGFILENAMES )
+                    Console . WriteLine ( $"Parsing {pathfilename}..." );
+            }
+            else if ( argstring . Contains ( "2" ) )
+            {
+                pathfilename = pathfilename = "C:\\Wpfmain\\utils2.cs";
+                searchfile = GetFilenameFromPath ( pathfilename . Trim ( ) , out filepath );
+                AllFileNames [ 0 ] = searchfile;
+                FullPathFileNameList . Add ( pathfilename );
+                searchpath = filepath;
+                TotalFiles = 1;
+                if ( LOGFILENAMES )
+                    Console . WriteLine ( $"Parsing {pathfilename}..." );
+            }
+            else if ( argstring . Contains ( "," ) )
+            {
+                arguments = argstring . Split ( ( "," ) );
+                if ( arguments [ 1 ] == "" )
+                    return;
                 else
                 {
-                    AllSourcefiles = Directory . EnumerateFiles ( @"C:\wpfmain" , "*.*cs" );
-                    if ( AllSourcefiles . Count ( ) > 0 )
+                    if ( argstring . ToUpper ( ) . Contains ( ".CS" ) )
                     {
-                        //                        filesarray = new string [ AllSourcefiles . Count ( ) ];
-                        for ( int x = 0 ; x < AllSourcefiles . Count ( ) ; x++ )
-                        {
-                            string fname2 = AllSourcefiles . ElementAt ( x );
-                            filesarray [ x ] = fname2;
-                        }
-                        filescount = AllSourcefiles . Count ( );
+                        // Its a source file !!
+                        searchfile = GetFilenameFromPath ( argstring . Trim ( ) , out filepath );
+                        AllFileNames [ 0 ] = argstring;
+                        // PATH+NAME of only file in array
+                        pathfilename = argstring;
+                        searchpath = filepath;
+                        TotalFiles = 1;
+                        if ( LOGFILENAMES )
+                            Console . WriteLine ( $"Parsing {pathfilename}..." );
+                    }
+                    else
+                    {
+                        // its a path
+                        // PATH+NAME of 1st file in array
+                        // Get iterative list of dirs and files ??
+                        argstring = @"C:\wpfmain\";
+                        TotalFiles = DoSetup ( argstring );
                     }
                 }
             }
             else
             {
-                filesarray [ 0 ] = args [ 0 ] . Trim ( );
-                filescount = 1;
+                // no digits or commans identified, must be  a file name  ?
+                if ( argstring . ToUpper ( ) . Contains ( ".CS" ) )
+                {
+                    // Its a source file !!
+                    searchfile = GetFilenameFromPath ( argstring . Trim ( ) , out filepath );
+                    AllFileNames [ 0 ] = argstring;
+                    // PATH+NAME of only file in array
+                    pathfilename = argstring;
+                    TotalFiles = 1;
+                }
+                else
+                {
+                    // its a path
+                    // PATH+NAME of 1st file in array
+                    // Get iterative list of dirs and files ??
+                    TotalFiles = DoSetup ( argstring );
+                }
             }
+            if ( TotalFiles == 0 )
+                return;
 
-            for ( int z = 0 ; z < filescount ; z++ )
+            File . WriteAllText ( $@"C:\wpfmain\documentation\MethodsIndex.txt" , "" );
+            File . WriteAllText ( $@"C:\wpfmain\documentation\Methodsfiles.txt" , "" );
+            File . WriteAllText ( $@"C:\wpfmain\documentation\AllOutput.txt" , "" );
+            File . WriteAllText ( $@"C:\wpfmain\documentation\AllMethods.txt" , "" );
+            File . WriteAllText ( $@"C:\wpfmain\documentation\Duplicateslist.txt" , "" );
+            File . WriteAllText ( @"C:\wpfmain\documentation\AllTuples.txt" , "" ); ;
+
+            #endregion setup
+
+            for ( int z = 0 ; z < TotalFiles ; z++ )
             {
-                if ( filesarray [ z ] == null ) return;
+                // GET THE NEXT FILE
+                #region setup next file to be parsed
+                if ( FullPathFileNameList [ z ] == null ) return;
                 // loop through ALL FILES in array
-                filename = filesarray [ z ];
-
-                Debug . WriteLine ( $"{underline . Substring ( 0 , filename . Length + 13 )}\n" );
-                Debug . WriteLine ( $"METHODS IN : {filename . Trim ( )}" );
-                Debug . WriteLine ( $"{underline . Substring ( 0 , filename . Length + 13 )}\n" );
-
-                // read this file into memory
-                buffer = File . ReadAllText ( filesarray [ z ] );
-                GetFilenameFromPath ( filename . Trim ( ) , out fname );
-
+                pathfilename = FullPathFileNameList [ z ];
+                CurrentFile = pathfilename;
+                if ( LOGFILENAMES )
+                    Debug . Write ( $"\nParsing {CurrentFile . Trim ( )}" );
+                // read current file into memory
+                buffer = File . ReadAllText ( FullPathFileNameList [ z ] );
                 capsbuffer = buffer . ToUpper ( );
                 lines = buffer . Split ( "\n" );
                 upperlines = capsbuffer . Split ( "\n" );
-                Debug . WriteLine ( $"Processing {filename} of {lines . Length} lines" );
-                bool found = false;
                 int type = -1;
-
+                TotalLines += lines . Length;
+                #endregion setup next file to be parsed
                 //****************************************************//
                 // loop through next FILE in array and  process all LINES
                 //****************************************************//
                 for ( int x = 0 ; x < lines . Length ; x++ )
                 {
+                    if ( IsDupe )
+                        x--;
+                    //if ( x % 25 == 0 )
+                    //    Debug . Write ( "." );
                     try
                     {
-                        int testcount = 0;
-//                        Debug . Assert ( x != 959 );
-                        lines [ x ] = StripFormattingChars ( lines [ x ] );
-                        ///upperline = lines [ x ] . Trim ( ) . ToUpper ( );
+                        lines [ x ] = Datastore . StripFormattingChars ( lines [ x ] );
                         if ( upperlines [ x ] . Length < 10 )
                             continue;
                         lines [ x ] = lines [ x ] . Trim ( );
                         upperlines [ x ] = upperlines [ x ] . Trim ( );
 
-
-                        // TODO  remove this
-                        if ( upperlines [ x ] . StartsWith ( "PUBLIC" ) == false )
-                            continue;
-                        x = x;
-                        //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^//
-                        if ( upperlines [ x ] . ToUpper ( ) . Contains ( "GETSCROLLSPEED)" ) == true )
-                            Debug . Assert ( upperlines [ x ] . ToUpper ( ) . Contains ( "GETSCROLLSPEED)" ) == false );
-                        //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^//
-                        // Discard everything we know we are not interested in first 
+                        #region Validate it is a procedure
+                        if ( found == false )
                         {
-                            if ( upperlines [ x ] . StartsWith ( "PUBLIC" ) || upperlines [ x ] . StartsWith ( "STATIC PUBLIC" ) == false )
-                            {
-                                testcount++;
-                                if ( upperlines [ x ] . StartsWith ( "PRIVATE" ) || upperlines [ x ] . StartsWith ( "STATIC PRIVATE" ) == false )
-                                {
-                                    testcount++;
-                                    if ( upperlines [ x ] . StartsWith ( "INTERNAL" ) || upperlines [ x ] . StartsWith ( "STATIC INTERNAL" ) == false )
-                                        testcount++;
-                                }
-                                if ( testcount != 3 )
-                                    continue;
-                            }
-
-                            if ( ( upperlines [ x ] . Trim ( ) . StartsWith ( "PUBLIC" ) == true ||
-                                upperlines [ x ] . Trim ( ) . StartsWith ( "PRIVATE" ) == true ||
-                                upperlines [ x ] . Trim ( ) . StartsWith ( "PROTECTED" ) == true )
-                                && ( upperlines [ x ] . Trim ( ) . Contains ( "=" ) == true && upperlines [ x ] . Trim ( ) . Contains ( "NEW" ) == true ) )
+                            if ( Validators . ValidateIsProcedure ( lines [ x ] , upperlines , x ) == false )
                                 continue;
-                            else if ( upperlines [ x ] . Trim ( ) . StartsWith ( "//" ) == true
-                                || upperlines [ x ] . Trim ( ) . StartsWith ( "/*" ) == true
-                                || upperlines [ x ] . Trim ( ) . EndsWith ( "*/" ) == true )
+                            //************** VERIFY it is a procedure *************//
+                            if ( Validators . IsProcedure ( upperlines [ x ] ) == false )
                                 continue;
-                            else if ( upperlines [ x ] . StartsWith ( "//" ) == true )
-                                continue;
-                            //else if ( found == false && lines [ x ] . Contains ( "(" ) == false )
-                            //    continue;
-                            else if ( upperlines [ x ] . StartsWith ( "//" ) == true
-                                || upperlines [ x ] . StartsWith ( "//*" ) == true
-                                || upperlines [ x ] . StartsWith ( "*" ) == true )
-                                continue;
-                            else if ( upperlines [ x ] . Contains ( "(" ) == false
-                                && ( upperlines [ x ] . Contains ( "<" ) == true
-                                || upperlines [ x ] . Contains ( ">" ) == true ) )
-                                continue;
-                            else if ( upperlines [ x ] . Length <= 2 )
-                                continue;
-                            if ( upperlines [ x ] . Contains ( "=" ) == true && upperlines [ x ] . Contains ( "NEW" ) == true )
-                            {
-                                // Its a NEW statement, ignore it !
-                                int a = upperlines [ x ] . IndexOf ( "=" );
-                                int b = upperlines [ x ] . IndexOf ( "NEW" );
-                                if ( a < b )
-                                    continue;
-                            }
-                            // Work thru exceptions we do  NOT WANT to list
-                            // ignore defaullt delegate declarations
-                            if ( upperlines [ x ] . Contains ( "FUNC" ) == true || upperlines [ x ] . Contains ( "ACTION" ) == true )
-                                continue;
+                            ////****************************************************//
                         }
-                        //************** VERIFY it is a procedure *************//
-                        if ( IsProcedure ( upperlines [ x ] ) == false )
-                            continue;
-                        //****************************************************//
-
+                        #endregion Validate it is a procedure
 
                         //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^//
-                        //                        Debug . Assert ( upperlines [x] .Contains ( "PARSETABLECOLUMNDATA" ) == false );
+                        if ( SHOWASSERT )
+                            Debug . Assert ( lines [ x ] . Contains ( "GetBankAccounts" ) == false , "Found GetBankAccounts" , "" );
+                        //Debug . Assert ( x == 210 == false );
                         //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^//
 
                         if ( found == true )
                         {
                             // WE are parsing the following lines in a procedure declaration.
-                            lines [ x ] = StripFormattingChars ( lines [ x ] . Trim ( ) );
+                            lines [ x ] = Datastore . StripFormattingChars ( lines [ x ] . Trim ( ) );
                             upperline = lines [ x ] . ToUpper ( );
-
-                            Debug . WriteLine ( $"lines[x] ..." );
-
                             if ( lines [ x ] . Contains ( "," ) && lines [ x ] . EndsWith ( "," ) )
                             {
-                                AddProcRow ( $"{lines [ x ]}" , type , isArg: true , crlf: 1 );
-                                $"{lines [ x ]}" . log ( );
+                                // TODO  not   sure about this
+                                Datastore . AddProcRow ( x , $"{lines [ x ]}" , pathfilename , type , isArg: true , crlf: 1 );
                                 x++;
                             }
                             // get an array of arguments and ouput them all
+                            string [ ] parts = lines [ x ] . Split ( "," );
+                            if ( parts . Length > 1 )
+                            {
+                                foreach ( string item in parts )
+                                {
+                                    Datastore . AddProcRow ( x , $"{item}" , pathfilename , type , isArg: true , crlf: 1 );
+                                }
+                            }
+                            else
+                                Datastore . AddProcRow ( x , $"{lines [ x ]}" , pathfilename , type , isArg: true , crlf: 1 );
+
                             string [ ] rows = ParselinesFromProcedure ( lines , type , ref x );
                             for ( int y = 0 ; y < rows . Length ; y++ )
                             {
-                                rows [ y ] = StripFormattingChars ( rows [ y ] . Trim ( ) );
-                                AddProcRow ( $"{rows [ y ]}" , type , isArg: true , crlf: 1 );
-                                $"{rows [ y ]}" . log ( );
-
+                                rows [ y ] = Datastore . StripFormattingChars ( rows [ y ] . Trim ( ) );
+                                // dont fall past end of method declaration
+                                if ( rows [ y ] != "{" )
+                                    Datastore . AddProcRow ( x , $"{rows [ y ]}" , pathfilename , type , isArg: true , crlf: 1 );
                                 if ( y == rows . Length - 1 )
                                 {
-                                    found = false;
                                     break;
                                 }
                             }
-                            //AddProcRow ( $"\n" , type , crlf: 1 );
+                            found = false;
                             continue;
                         }
-                        if ( DOCONTINUE )
-                        {
-                            AddProcRow ( $"{lines [ x ] . Trim ( )}" , type , isArg: true , crlf: 1 );
-                            $"{lines [ x ] . Trim ( )}" . log ( );
-                            if ( lines [ x ] . Contains ( ");" ) )
-                                DOCONTINUE = false;
-                            continue;
-                        }
+                        //if ( DOCONTINUE )
+                        //{
+                        //    Datastore . AddProcRow ( x , $"{lines [ x ] . Trim ( )}" , pathfilename , type , isArg: true , crlf: 1 );
+                        //    $"{lines [ x ] . Trim ( )}" . log ( );
+                        //    if ( lines [ x ] . Contains ( ");" ) )
+                        //        DOCONTINUE = false;
+                        //    continue;
+                        //}
 
                         //************************//
                         // *** Main entry point  ***
                         //************************//
 
                         // Check for ATTACHED PROPERTY
-                        if ( ( upperlines [ x ] . Contains ( "PUBLIC STATIC READONLY DEPENDENCY" )
-                            || upperlines [ x ] . Contains ( "DEPENDENCYPROPERTY . REGISTERATTACHED" ) ) )
+                        if ( Validators . CheckForAttachedProperty ( upperlines , x ) == true )
                         {
-                            // Get entire method code as a block of x lines
-                            string method = GetMethodBody ( lines [ x ] , lines , ref x );
-                            AddProcRow ( $"ATTACHED PROPERTY" , type , isHeader: true , crlf: 1 );
-                            AddProcRow ( method , type , crlf: 2 );
-                            method . log ( );
-                            // AddProcRow ( "\n" , type , crlf: 1 );
-                            continue;
+                            try
+                            {
+                                // Get entire method code as a block of x lines
+                                string method = GetMethodBody ( lines [ x ] , lines , ref x );
+                                Datastore . AddProcRow ( x , $"ATTACHED PROPERTY" , pathfilename , type , isHeader: true , crlf: 1 );
+                                Datastore . AddProcRow ( x , method , pathfilename , type , crlf: 2 );
+                                method . log ( );
+                                continue;
+                            }
+                            catch ( Exception ex ) { Debug . WriteLine ( $"\nERROR Program 294, \n{ex . Message}" ); TotalExErrors++; }
                         }
 
-                        //  Set storage type
-                        GetStorageType ( upperline , ref type );
-
+                        // START of processing the line we have got
                         if ( found == false && upperlines [ x ] . Contains ( '(' ) )
                         {
                             // Got the start of a procedure ?
-                            if ( testbuffer != null )
-                                testbuffer . Clear ( );
+                            try
+                            {
+                                //  Set storage type (Public=1/private=2/internal=3)
+                                GetStorageType ( upperline , ref type );
+                            }
+                            catch ( Exception ex ) { Debug . WriteLine ( $"\nERROR Program 306, \n{ex . Message}" ); TotalExErrors++; }
 
-                            // We have already tested for this above and its a procedure mehod !!
-                            lines [ x ] = StripFormattingChars ( lines [ x ] . Trim ( ) );
-
-                            // Is it a single line entry ?
+                            upperline = lines [ x ] . ToUpper ( );
+                            lines [ x ] = Datastore . StripFormattingChars ( lines [ x ] . Trim ( ) );
+                            upperlines [ x ] = lines [ x ] . Trim ( ) . ToUpper ( );
                             if ( upperlines [ x ] . Contains ( "(" ) && upperlines [ x ] . Contains ( ")" ) )
                             {
-                                // its a oneliner !!
-                                // handle method name banner line 1st
-                                string [ ] procname = lines [ x ] . Split ( "(" );
-                                if ( procname [ 1 ] . Trim ( ) . Contains ( "," ) )
+                                //*****************//
+                                // Output a one liner !!
+                                //*****************//
+                                //                           Validators . CreateOneLineItem ( AllMethods , pathfilename , lines [ x ] , type , x );
+                                string FullOutputLine = $"{pathfilename} : {lines [ x ]} : {x}";
+                                
+                                if ( Datastore . AddProcname ( x , FullOutputLine , pathfilename , type ) == false )
                                 {
-                                    // got multi arguments
-                                    // output  header line
-                                    Debug . WriteLine ( procname [ 0 ] . log ( ) );
-                                    AddProcname ( $"{procname [ 0 ]} : [ {filename} ]" , type , isFname: true );
-                                    string [ ] tmp = procname [ 1 ] . Trim ( ) . Split ( "," );
-                                    for ( int w = 0 ; w < tmp . Length ; w++ )
+                                    Debug . WriteLine ( $"Failed to AddProcname line 325 : Line {lines [ x ]}" );//TODO  handle error
+                                    Tuple<int , string , string> dbugtuple = Tuple . Create ( 325 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
+                                    Program . DebugErrors . Add ( dbugtuple );
+                                    continue;
+                                }
+                                else if ( upperlines [ x ] . Contains ( "(" ) )
+                                {
+                                    //it has "(" but no more, so probably multi argument ?
+                                    // handle method name banner line 1st
+                                    string [ ] procname = lines [ x ] . Split ( "(" );
+                                    if ( procname [ 1 ] . Trim ( ) . Contains ( "," ) == true )
                                     {
-                                        if ( w == tmp . Length - 1 )
+                                        // got multi arguments
+                                        //**************************************//
+                                        // output  header line of multi linner
+                                        //**************************************//
+                                        try
                                         {
-                                            AddProcRow ( $"{tmp [ w ]}" , type , isArg: true , crlf: 2 );
-                                            $"{tmp [ w ]}" . log ( );
+                                            bool result = Datastore . AddProcname ( x , $"{procname [ 0 ]} : [ {pathfilename} ]" , pathfilename , type , isFname: true );
+                                            if ( result == false )
+                                            {
+                                                // Handle a duplicate here cos we cannot easily do it in the called procedure
+                                                Tuple<int , string , string> dbugtuple = Tuple . Create ( 345 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
+                                                Program . DebugErrors . Add ( dbugtuple );
+                                                Tuple<int , string , string> tuple = Tuple . Create ( x , path . Trim ( ) , "");
+                                                ErrorPaths . Add ( tuple );
+                                            }
+                                        }
+                                        catch ( Exception ex )
+                                        {
+                                            Debug . WriteLine ( $"\nERROR Program 345 \n{lines [ x ]} : {ex . Message}" );
+                                            TotalExErrors++;
+                                        }
+
+                                        string [ ] tmp = procname [ 1 ] . Trim ( ) . Split ( "," );
+                                        for ( int w = 0 ; w < tmp . Length ; w++ )
+                                        {
+                                            try
+                                            {
+                                                if ( w == tmp . Length - 1 )
+                                                    Datastore . AddProcRow ( x , $"{tmp [ w ]}" , pathfilename , type , isArg: true , crlf: 2 );
+                                                else
+                                                {
+                                                    Datastore . AddProcRow ( x , $"{tmp [ w ]}" , pathfilename , type , isArg: true , crlf: 1 );
+                                                    $"{tmp [ w ]}" . log ( );
+                                                }
+                                            }
+                                            catch ( Exception ex )
+                                            {
+                                                Debug . WriteLine ( $"\nERROR Program 364, \n{ex . Message}" );
+                                                TotalExErrors++;
+                                            }
+                                        }
+                                        continue;
+                                    }
+                                    else if ( upperlines [ x ] . Contains ( "(" ) )
+                                    {
+                                        bool result = true;
+                                        //no commas in line, so either multiple lines or only got (none or one ) arguments
+                                        if ( procname [ 1 ] . Trim ( ) == ")" )
+                                        {
+                                            // got it all on one line, process it
+                                            try
+                                            {
+                                                // no arguments, output full line with 2c/r's
+                                                result = Datastore . AddProcname ( x , $"{procname [ 0 ] . Trim ( )} : [ {pathfilename . Trim ( )} ]" , pathfilename , type , isFname: true );
+                                                if ( result == false )
+                                                {
+                                                    // Handle a duplicate here cos we cannot easily do it in the called procedure
+                                                    Tuple<int , string , string> dbugtuple = Tuple . Create ( 392 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
+                                                    Program . DebugErrors . Add ( dbugtuple );
+                                                    Tuple<int , string , string> tuple = Tuple . Create ( x , path . Trim ( ) , DictResults [ 0 ] . Trim ( ) );
+                                                    ErrorPaths . Add ( tuple );
+                                                }
+                                            }
+                                            catch ( Exception ex )
+                                            {
+                                                //Add entry to Error Tuple collection 
+                                                Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , procname [ 1 ] );
+                                                Program . ErrorPaths . Add ( tuple );
+                                                Debug . WriteLine ( $"\nERROR Program 394, \n{ex . Message}" );
+                                                TotalExErrors++;
+                                            }
+                                            try
+                                            {
+                                                if ( procname [ 1 ] != ")" && procname [ 1 ] != " )" )
+                                                    Datastore . AddProcRow ( x , $"{procname [ 0 ] . Trim ( )} ( )" , pathfilename , type , isAlone: true , crlf: 2 );
+                                                continue;
+                                            }
+                                            catch ( Exception ex )
+                                            {
+                                                //Add entry to Error Tuple collection 
+                                                Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , procname [ 1 ] );
+                                                Program . ErrorPaths . Add ( tuple );
+                                                Debug . WriteLine ( $"\nERROR Program 394, \n{ex . Message}" );
+                                                TotalExErrors++;
+                                            }
                                         }
                                         else
                                         {
-                                            AddProcRow ( $"{tmp [ w ]}" , type , isArg: true , crlf: 1 );
-                                            $"{tmp [ w ]}" . log ( );
+                                            bool result2 = true;
+                                            // no ending ), so must be split over > 1 line - so arguments probably exist.
+                                            //get rest of argumenst and then add procname to list
+                                            string [ ] proclines = new string [ 30 ];
+                                            int indexincrment = ParseAllMethodArgs ( lines , pathfilename , x , ref proclines );
+                                            //reset main index value to cover lines we have read in while processing in the above function
+                                            x += indexincrment;
+                                            try
+                                            {
+                                                //***************************************************************//
+                                                // We now have a string[] with all lines for this method in it.
+                                                // sequence is path, procname, args[].....
+                                                //grab the path + procname out of the top line of our new proclines tuple & remove its trailing "("
+                                                string pname = proclines [ 0 ] . Substring ( 0 , proclines [ 0 ] . Length - 1 );
+                                                //***************************************************************//
+                                                // Add procname to allmethods, then we save the remaining lines of arguments !
+                                                result2 = Datastore . AddProcname ( x , $"{pname} : {pathfilename}" , pathfilename , type , isFname: true , proclines );
+
+                                                if ( result2 == false )
+                                                {
+                                                    // Handle a duplicate or failure here cos we cannot easily do it in theAddProcName() procedure
+                                                    //List<Tuple<int , string , string>> ErrorPaths
+                                                    // Add procname to errors list - OK
+                                                    Tuple<int , string , string> dbugtuple = Tuple . Create ( 443 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
+                                                    Program . DebugErrors . Add ( dbugtuple );
+                                                    Tuple<int , string , string> tuple = Tuple . Create ( x , pathfilename . Trim ( ) , pname . Trim ( ) );
+                                                    ErrorPaths . Add ( tuple );
+                                                }
+                                            }
+                                            catch ( Exception ex )
+                                            {
+                                                // TODO  Fix this problem
+                                                //This is the main error
+                                                Debug . WriteLine ( $"\nERROR Program 441\n {lines [ x ]}, \n{ex . Message}" );
+                                                TotalExErrors++;
+                                                //return;
+                                            }
+                                            // set flag to trigger args block processing
+                                            found = true;
+                                            continue;
+
                                         }
+                                    }
+                                    else continue;
+                                }
+                                else if ( upperlines [ x ] . Contains ( "(" ) )
+                                {
+                                    string methodname = "";
+                                    try
+                                    {
+                                        // it appears to be spread over more than one line
+                                        methodname = $"{lines [ x ] . Substring ( 0 , lines [ x ] . IndexOf ( "(" ) ) . Trim ( )} (";
+                                        bool result = Datastore . AddProcname ( x , line: lines [ x ] , pathfilename , type );
+                                        if ( result == false )
+                                        {
+                                            // Handle a duplicate here cos we cannot easily do it in the called procedure
+                                            //List<Tuple<int , string , string>> ErrorPaths
+                                            Tuple<int , string , string> dbugtuple = Tuple . Create ( 479 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
+                                            Program . DebugErrors . Add ( dbugtuple );
+                                            Tuple<int , string , string> tuple = Tuple . Create ( x , path . Trim ( ) , methodname . Trim ( ) );
+                                            ErrorPaths . Add ( tuple );
+                                        }
+                                    }
+                                    catch ( Exception ex )
+                                    {
+                                        Debug . WriteLine ( $"\nERROR Program 473, \n{ex . Message}" );
+                                        // Handle a duplicate here cos we cannot easily do it in the called procedure
+                                        //List<Tuple<int , string , string>> ErrorPaths
+                                        Tuple<int , string , string> tuple = Tuple . Create ( x , path . Trim ( ) , methodname . Trim ( ) );
+                                        ErrorPaths . Add ( tuple );
+                                        TotalExErrors++;
                                     }
                                     continue;
                                 }
-                                else
-                                {
-                                    //only got one argument
-                                    if ( procname [ 1 ] . Trim ( ) == ")" )
-                                    {
-                                        // no arguments, output full line with 2c/r's
-                                        AddProcRow ( $"{procname [ 0 ] . Trim ( )} ( )" , type , isAlone: true , crlf: 2 );
-                                        $"{procname [ 0 ] . Trim ( )} ( )" . log ( );
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        AddProcname ( $"{procname [ 0 ]} : [ {filename} ]" , type , isFname: true );
-                                        AddProcRow ( $"{procname [ 1 ] . Trim ( )}" , type , isArg: true , crlf: 2 );
-                                        //                                        $"{procname [ 1 ] . Trim ( )}" . log ( );
-                                        continue;
-                                    }
-                                }
-                            }
-                            else if ( upperlines [ x ] . Contains ( "(" ) )
-                            {
                                 try
                                 {
-                                    // it appears to be spread over more than one line
-                                    string methodname = $"{lines [ x ] . Substring ( 0 , lines [ x ] . IndexOf ( "(" ) ) . Trim ( )} (";
-                                    AddProcname ( $"{methodname} : [{filename}]" , type );
-                                    AddProcRow ( $"{methodname}" , type , crlf: 1 );
-                                    $"{methodname}" . log ( );
-
                                     rows = ParselinesFromProcedure ( lines , type , ref x );
                                     for ( int y = 0 ; y < rows . Length ; y++ )
                                     {
-                                        rows [ y ] = StripFormattingChars ( rows [ y ] . Trim ( ) );
-                                        AddProcRow ( $"{rows [ y ]}" , type , isArg: true , crlf: 1 );
-                                        $"{rows [ y ]}" . log ( );
+                                        rows [ y ] = Datastore . StripFormattingChars ( rows [ y ] . Trim ( ) );
+                                        if ( y == rows . Length - 1 )
+                                            Datastore . AddProcRow ( x , $"{rows [ y ]}" , pathfilename , type , isArg: true , crlf: 2 );
+                                        else
+                                            Datastore . AddProcRow ( x , $"{rows [ y ]}" , pathfilename , type , isArg: true , crlf: 1 );
 
                                         if ( y == rows . Length - 1 )
                                         {
@@ -344,184 +516,57 @@ namespace CsharpParser
                                             break;
                                         }
                                     }
-                                    continue;
                                 }
-                                catch ( Exception ex ) { Debug . WriteLine ( "" ); }
+                                catch ( Exception ex )
+                                {
+                                    Debug . WriteLine ( $"Error line 497 {lines [ x ]}\n{ex . Message}" );
+                                }
                                 continue;
                             }
                         }
                     }
-                    catch ( Exception ex )
+                    catch ( Exception ex )  // outer catch()
                     {
-                        Debug . WriteLine ( $"Oooops : {ex . Message}" );
+                        Debug . WriteLine ( $"Oooops : \nERROR Program 504 \n{ex . Message}" );
+                        IsDupe = true;
                     }
                 }
-                Alllinescount += filescount;
+
+                TotalLines += linescount;
             }
             Console . WriteLine ( $"Completed  - now creating report  files !!!!!" );
-            CreateReports ( );
-            string str3 = File . ReadAllText ( $@"C:\wpfmain\documentation\AllOutput.txt" );
-            string str2 = $"ALL {Alllinescount} Methods in File or files \ncreated {DateTime . Now . ToString ( )}\n\n";
-            File . Delete ( $@"C:\wpfmain\documentation\AllOutput.txt" );
-            File . WriteAllText ( $@"C:\wpfmain\documentation\AllOutput.txt" , str2 );
-            File . AppendAllText ( $@"C:\wpfmain\documentation\AllOutput.txt" , str3 );
-
-            Console . WriteLine ( $"{Alllinescount} - All Methods parsed !!!!!" );
+            Reporting . DoReporting ( );
+            Reporting.WriteDebugErrors ( );
         }
 
-        private static void AddProcname ( string line , int type , bool isFname = false )
+        private static int DoIterativeReport ( string fpath )
         {
-            string fname = "", leadin = "";
-            string [ ] tmp = line . Split ( " : " );
-            try
+            DirectoryInfo di = new ( fpath );
+
+            int totalfiles = WalkDirectoryTree ( di , filespec );
+
+            string path1 = $@"C:\wpfmain\documentation\ AllDirectories.txt";
+            string path2 = $@"C:\wpfmain\documentation\ AllFiles.txt";
+            if ( FulldirectoriesList != null )
             {
-                AddProcRow ( $"*** {tmp [ 1 ]}\n" , type , crlf: 1 );
-                AddProcRow ( $"{tmp [ 0 ] . Trim ( )}" , type , isHeader: true , crlf: 1 );
-                try
+                File . WriteAllText ( path1 , $"{underline}\nCsharpParser.EXE : OUTPUT\nList of ALL ({FulldirectoriesList . Count}) directories checked.\nFile Created : {DateTime . Now . ToString ( )}\n{underline}\n\n" );
+                foreach ( string item in FulldirectoriesList )
                 {
-                    //if ( tmp [ 0 ] . Trim ( ) . EndsWith ( "(" ) )
-                    //    leadin = tmp [ 0 ] . Trim ( ).Substring ( 0 , leadin . Length - 1 );
-                    AllMethods . Add ( $"{tmp [ 0 ] . Trim ( )}" , filename.Trim() );
-                }
-                catch ( Exception ex )
-                {
-                    Errormethods . Add ( $"({errorindex++})\n   {filename}" . ToString ( ) , tmp [ tmp . Length - 1 ] . Trim ( ) );
+                    File . AppendAllText ( path1 , $"{item}\n" );
                 }
             }
-            catch ( Exception ex ) { Debug . WriteLine ( "" ); }
+            if ( FullfilesList != null )
+            {
+                File . WriteAllText ( path2 , $"{underline}\nCsharpParser.EXE : OUTPUT\nList of ({FullfilesList . Count}) files checked. \nFile Created : {DateTime . Now . ToString ( )}\n{underline}\n\n" );
+                foreach ( string item in FullfilesList )
+                {
+                    File . AppendAllText ( path2 , $"{item}\n" );
+                }
+            }
+            return totalfiles;
         }
+        // NOT IN USE
 
-        private static void AddProcRow ( string line , int type ,
-            //bool isFirst = false , bool isLast = false ,
-            bool isAlone = false , bool isArg = false ,
-            //bool isMain = false,
-            bool isHeader = false ,
-            int crlf = 1 )
-        {
-            try
-            {
-                line = line . Trim ( );
-                // Santy check
-                if ( type == -1 ) type = 1;
-                string debgoutput = "";
-
-                // handle ful output list file 1st
-                //if ( line == "EOF" )
-                //    debgoutput = line;
-                //else
-                //{
-                if ( line . Contains ( "Oooops" ) == false && line . Contains ( "Cannot  add" ) == false )
-                {
-                    if ( isAlone )
-                        debgoutput = $"{line}";
-                    if ( isArg )
-                        debgoutput = $"   {line}";
-                    else
-                        debgoutput = $"{line}";
-
-                    if ( crlf == 1 )
-                        debgoutput += "\n";
-                    else if ( crlf == 2 )
-                        debgoutput += "\n\n";
-                    //}
-                }
-                File . AppendAllText ( $@"C:\wpfmain\documentation\AllOutput.txt" , debgoutput );
-                linescount++;
-
-                // handle Dictonary output 2nd
-                if ( line == "EOF" )
-                    line = "";
-
-                if ( type == 1 )
-                    output_public . Append ( $"{line}\n" );
-                else if ( type == 2 )
-                    output_private . Append ( $"{line}\n" );
-                else if ( type == 3 )
-                    output_internal . Append ( $"{line} \n" );
-            }
-            catch ( Exception ex ) { Debug . WriteLine ( "" ); }
-            return;
-        }
-
-        private static string StripFormattingChars ( string line )
-        {
-            try
-            {
-                if ( line == null )
-                    return "";
-                while ( true )
-                {
-                    if ( line . StartsWith ( "\t" ) )
-                        line = line . Substring ( 1 );
-                    else
-                        break;
-                }
-                while ( true )
-                {
-                    if ( line . EndsWith ( "\t" ) )
-                        line = line . Substring ( 0 , line . Length - 1 );
-                    else
-                        break;
-                }
-                while ( true )
-                {
-                    if ( line . StartsWith ( "\r" ) )
-                        line = line . Substring ( 1 );
-                    else
-                        break;
-                }
-                while ( true )
-                {
-                    if ( line . EndsWith ( "\r" ) )
-                        line = line . Substring ( 0 , line . Length - 1 );
-                    else
-                        break;
-                }
-                if ( line . EndsWith ( "\r" ) )
-                    line = line . Substring ( 0 , line . Length - 1 );
-                if ( line . EndsWith ( "," ) )
-                    line = line . Substring ( 0 , line . Length - 1 );
-            }
-            catch ( Exception ex ) { Debug . WriteLine ( "" ); }
-            return line;
-        }
-        private static string CreateOutfile ( StringBuilder pub , StringBuilder priv , StringBuilder intern )
-        {
-            string sbcollection = "";
-            string publicstring = pub . ToString ( );
-            for ( int x = 0 ; x < pub . Length ; x++ )
-            {
-                if ( pub . Length > 0 )
-                {
-                    string entry = pub [ x ] . ToString ( ) . Trim ( ) . ToUpper ( );
-                    if ( entry . ToUpper ( ) . StartsWith ( "PUBLIC" ) )
-                        output_public . Append ( $"{pub [ x ]}\n" );
-                }
-            }
-            for ( int x = 0 ; x < priv . Length ; x++ )
-            {
-                if ( priv . Length > 0 )
-                {
-                    string entry = priv [ x ] . ToString ( ) . Trim ( ) . ToUpper ( );
-                    if ( entry . ToUpper ( ) . StartsWith ( "PRIVATE" ) )
-                        output_private . Append ( $"{priv [ x ]}\n" );
-                }
-            }
-            for ( int x = 0 ; x < intern . Length ; x++ )
-            {
-                if ( intern . Length > 0 )
-                {
-                    string entry = intern [ x ] . ToString ( ) . Trim ( ) . ToUpper ( );
-                    if ( entry . ToUpper ( ) . StartsWith ( "INTERNAL" ) )
-                        output_internal . Append ( $"{intern [ x ]}\n" );
-                }
-            }
-            sbcollection += output_public . ToString ( );
-            sbcollection += output_private . ToString ( );
-            sbcollection += output_internal . ToString ( );
-            // return a string full of data
-            return sbcollection;
-        }
 
         // not used
         private static void writeArgs ( List<string> data , int type , string line = "" )
@@ -569,43 +614,17 @@ namespace CsharpParser
                 }
                 return output;
             }
-            catch ( Exception ex ) { Debug . WriteLine ( "" ); }
+            catch ( Exception ex ) { Debug . WriteLine ( "\nERROR Program 565, \n{ex.Message}" ); TotalExErrors++; }
             return output;
         }
-        private static void CreateErrorsFile ( Dictionary<string , string> Errormethods )
-        {
-            SortedList<string , string> sortlist = new ( );
-            string output = "";
-            string string3 = "duplicate procedure names ??\n==================\n\nThese methods could not be added to our ALLMETHODS dictionary, so they are\neither duplicates in a different file, or Overloaded versions, probably in the same file.\n\nThis data  is created  by running\nthe [C:\\users\\ianch\\repos\\CSharpParser] Console App that\ncan handle single files or complete directories.\nIt does NOT currently parse directories iteratively\n";
-            string date = DateTime . Now . ToString ( );
-            string3 += $"Data Created : {date}\n\n";
-            output = string3;
-            foreach ( KeyValuePair<string , string> item in Errormethods )
-            {
-                string str = $"{item . Value} : {item . Key} ";
-                output += $"{str}\n";
-                string [ ] fn = item . Key . Split ( "  " );
-                sortlist . Add ( $"{item . Value} : {fn [ 0 ]}" , $"{fn [ 1 ]}  :  {fn [ 0 ]}" );
-            }
-            File . WriteAllText ( $@"C:\wpfmain\Documentation\Errorslist.txt" , output );
-            string3 = "Duplicated Methods\n==============\n\nThis data  is created  by running\nthe [C:\\users\\ianch\\repos\\CSharpParser] Console App that\ncan handle single files or complete directories.\nIt does NOT currently parse directories iteratively\n";
-            date = DateTime . Now . ToString ( );
-            string3 += $"Data Created : {date}\n\n";
-            List<string> AllProcnames = new ( );
-            foreach ( KeyValuePair<string , string> item in sortlist )
-            {
-                string [ ] string1;
-                string [ ] string2;
-                string1 = item . Key . Split ( ":" );
-                string2 = item . Value . Split ( ":" );
-                string procname = string1 [ 0 ] . Substring ( 0 , string1 [ 0 ] . Length - 2 );
-                string [ ] pname = procname . Trim ( ) . Split ( " " );
-                AllProcnames . Add ( pname [ pname . Length - 1 ] );
-                string3 += $"{string1 [ 0 ] . Substring ( 0 , string1 [ 0 ] . Length - 2 ) . PadRight ( 60 )} {string2 [ 1 ]}\n";
-            }
-            var sortedList = AllProcnames . OrderBy ( x => x ) . ToList ( );
-            File . WriteAllText ( $@"C:\wpfmain\Documentation\Duplicateslist.txt" , string3 );
-        }
+
+        /// <summary>
+        ///  parses the current line and returns  a string[] with data split
+        /// </summary>
+        /// <param name="lines"></param>
+        /// <param name="type"></param>
+        /// <param name="x"></param>
+        /// <returns></returns>
         private static string [ ] ParselinesFromProcedure ( string [ ] lines , int type , ref int x )
         {
             x++;
@@ -617,9 +636,14 @@ namespace CsharpParser
                 {
                     for ( int y = 0 ; y < args . Length ; y++ )
                     {
-                        args [ y ] = StripFormattingChars ( args [ y ] . Trim ( ) );
+                        args [ y ] = Datastore . StripFormattingChars ( args [ y ] . Trim ( ) );
                         if ( y == args . Length - 1 )
-                            output [ y ] = $"{args [ y ]} )\n";
+                        {
+                            if ( args [ y ] . EndsWith ( ")" ) == false )
+                                output [ y ] = $"{args [ y ]} )\n";
+                            else
+                                output [ y ] = $"{args [ y ]}\n";
+                        }
                         else
                             output [ y ] = $"{args [ y ]}\n ";
                     }
@@ -632,34 +656,19 @@ namespace CsharpParser
                     return str;
                 }
             }
-            catch ( Exception ex ) { Debug . WriteLine ( "" ); }
+            catch ( Exception ex ) { Debug . WriteLine ( "\nERROR Program 607, \n{ex.Message}" ); TotalExErrors++; }
             return lines;
         }
-        private static bool IsProcedure ( string upperline )
-        {
-            if ( ( upperline . StartsWith ( "PUBLIC" ) || upperline . StartsWith ( "STATIC PUBLIC" ) )
-                || ( upperline . StartsWith ( "PRIVATE" ) || upperline . StartsWith ( "STATIC PRIVATE" ) )
-                || ( upperline . StartsWith ( "PROTECTED" ) || upperline . StartsWith ( "STATIC PROTECTED" ) )
-                || ( upperline . StartsWith ( "INTERNAL" ) || upperline . StartsWith ( "STATIC INTERNAL" ) ) )
-                return true;
-            return false;
-        }
+
         private static void GetStorageType ( string upperline , ref int type )
         {
             if ( ( upperline . StartsWith ( "PUBLIC" ) || upperline . StartsWith ( "STATIC PUBLIC" ) ) ) type = 1;
             else if ( ( upperline . StartsWith ( "PRIVATE" ) || upperline . StartsWith ( "STATIC PRIVATE" ) ) ) type = 2;
             else if ( ( upperline . StartsWith ( "INTERNAL" ) || upperline . StartsWith ( "STATIC INTERNAL" ) ) ) type = 3;
         }
-        /// <summary>
-        /// GetMethodBody  Parse out a block of code lines and return the cleaned
-        /// up presentation block to caller  to output it.
-        /// </summary>
-        /// <param name="currentline"></param>
-        /// <param name="lines"></param>
-        /// <param name="x"></param>
-        /// <returns></returns>
         private static string GetMethodBody ( string currentline , string [ ] lines , ref int x )
         {
+            // *** This only gets called for Attached properties ***
             // Parse out a block of code lines and return the cleaned
             // up presentation block to caller  to output it.
             int index = x;
@@ -704,76 +713,219 @@ namespace CsharpParser
                     }
                 }
             }
-            catch ( Exception ex ) { Debug . WriteLine ( $"oops$" ); }
+            catch ( Exception ex ) { Debug . WriteLine ( $"oops$ \nERROR Program 664, \n{ex . Message}" ); TotalExErrors++; }
             x = index;
             return output;
         }
-        private static void CreateReports ( )
+
+        public static int WalkDirectoryTree ( System . IO . DirectoryInfo root , string filespec )
         {
-            string sb = output_public . ToString ( );
-            sb += output_private . ToString ( );
-            sb += output_internal . ToString ( );
-            string [ ] ln = sb . Split ( "\n" );
-            string [ ] allines = new string [ ln . Length ];
+            //int totalfiles = 0;
+            int filesindex = 0;
+            FileInfo [ ] files = null;
+            DirectoryInfo [ ] subDirs = null;
 
-            //==========================================//
-            // Create output file ALLMETHODS.TXT
-            //==========================================//
-            path = @"C:\wpfmain\Documentation\AllMethods.txt";
-
-            File . AppendAllText ( path , $"Methods in : {fname}\n" );
-            File . AppendAllText ( path , $"Created : {DateTime . Now . ToString ( )}\n" );
-            File . AppendAllText ( path , $"{underline . Substring ( 0 , fname . Length + 13 )}\n\n" );
-            File . AppendAllText ( path , $"This list is created after parsing through all C# source files in the \nWpfMain root folder, looking for procedure/Methods" + $" and contains the \ndetails of the {ln . Length} Methods identiified in those file(s)... \n\n" );
-            File . AppendAllText ( path , $"{underline . Substring ( 0 , fname . Length + 13 )}\n" );
-
-            for ( int t = 0 ; t < ln . Length ; t++ )
+            // First, process all the files directly under this folder
+            try
             {
-                allines [ t ] = ln [ t ] . Trim( );
-                if ( allines [ t ] . StartsWith ( "***" ) )
-                    File . AppendAllText ( path , allines [ t ] .Trim() + ")\n" );
-                else if ( allines [ t ] . Contains ( "(" ) == false && allines [ t ] . Trim ( ) . Contains ( ")" ) == false )
-                    File . AppendAllText ( path , "   " + allines [ t ] . Trim ( ) + ")\n" );
-                else if ( allines [ t ] . Contains ( ")" ) == false )
-                    File . AppendAllText ( path , allines [ t ] . Trim ( ) + ")\n" );
-                else
-                    File . AppendAllText ( path , "   " + allines [ t ] . Trim ( ) + "\n\n" );
-            }
-            File . AppendAllText ( path , "\n\nEnd of File C:\\wpfmain\\Documentation\\AllMethods.txt .....\n" );
-
-            //==========================================//
-            // Now create file @"C:\Wpfmain\Documentation\MethodsIndex.txt"
-            // data comes from the AllMethods Dictionary entries captured here.
-            //==========================================//
-            StringBuilder sbMethods = new ( );
-            sbMethods . Append ( $"FILENAME = C:\\Wpfmain\\Documentation\\MethodsIndex.txt,\n\n RESULTS - ALL DOCUMENTED METHODS\n\nThis List should be a fairly comprehensive list of all available Methods in the c# files in the root of the WPFMAIN project.\nSome methods names are duplicated in different files, and these are listed in ErrorsList.txt\n\n" );
-            sbMethods . Append ( $"Created : {DateTime . Now . ToString ( )}\n\n" );
-
-            foreach ( KeyValuePair<string , string> item in AllMethods )
-            {
-                string str = $"{item . Value . Trim ( )} : {item . Key . Trim ( )} ";
-                sbMethods . Append ( $"{str}\n" );
-                Debug . WriteLine ( str );
-            }
-            Debug . WriteLine ( $"END OF RESULTS - ALL DOCUMENTED METHODS" );
-
-
-            Debug . WriteLine ( $"ERRORS - DUPLICATE METHOD NAMES" );
-            sbMethods . Append ( $"ERRORS - DUPLICATE METHOD NAMES\n" );
-            sbMethods . Append ( $"Created : {DateTime . Now . ToString ( )}\n" );
-            if ( Errormethods . Count > 0 )
-            {
-                foreach ( KeyValuePair<string , string> item in Errormethods )
+                files = root . GetFiles ( filespec );
+                foreach ( FileInfo item in files )
                 {
-                    string str = $"{item . Value . Trim ( )} : {item . Key . Trim ( )} ";
-                    sbMethods . Append ( $"{str}\n" );
-                    Debug . WriteLine ( $"{item . Value} : {item . Key} " );
+                    if ( item . Name . ToUpper ( ) . Contains ( ".TXT" ) == false )
+                        FullPathFileNameList . Add ( item . FullName );
                 }
-                Debug . WriteLine ( $"END OF ERRORS - DUPLICATE METHOD NAMES" );
-                CreateErrorsFile ( Errormethods );
             }
-            string content = $"{sbMethods . ToString ( )}\n";
-            File . WriteAllText ( @"C:\Wpfmain\Documentation\MethodsIndex.txt" , content );
+            // This is thrown if even one of the files requires permissions greater
+            // than the application provides.
+            catch ( UnauthorizedAccessException e )
+            {
+                // This code just writes out the message and continues to recurse.
+                // You may decide to do something different here. For example, you
+                // can try to elevate your privileges and access the file again.
+                Debug . WriteLine ( $"\nERROR Program 692 : {e . Message}" );
+            }
+
+            catch ( System . IO . DirectoryNotFoundException e )
+            {
+                Debug . WriteLine ( "\nERROR Program 697 : {e . Message}" );
+            }
+
+            if ( files != null )
+            {
+                try
+                {
+                    AddFilesToList ( files , ref filesindex );
+
+                    if ( CreateIterativeReport )
+                    {
+                        foreach ( System . IO . FileInfo fi in files )
+                        {
+                            // If we want to open, delete or modify the file, then
+                            // thea try-catch block is required here to handle the case
+                            // where the file has been deleted since the call to TraverseTree().
+
+                            string Files = fi . FullName . ToUpper ( );
+                            if ( Files . Contains ( ".G.CS" ) || Files . Contains ( "ASSEMBLY" ) )
+                                continue;
+                            else
+                            {
+                                FullfilesList . Add ( fi . FullName );
+                            }
+                        }
+                    }
+                }
+                catch ( Exception ex ) { Debug . WriteLine ( $"\nERROR Program 724, \n{ex . Message}" ); TotalExErrors++; }
+
+                // Now find all the subdirectories under this directory.
+                subDirs = root . GetDirectories ( );
+                DirectoryCount += subDirs . Length;
+
+                foreach ( System . IO . DirectoryInfo dirInfo in subDirs )
+                {
+                    string dirs = dirInfo . FullName . ToUpper ( ); ;
+                    if ( dirs . Contains ( "OBJ" ) || dirs . Contains ( "PROPERTIES" ) || dirs . Contains ( ".GIT" ) || dirs . Contains ( "BIN" )
+                          || dirs . Contains ( ".VS" ) || dirs . Contains ( "CONVERTERS" ) || dirs . Contains ( "SCRIPTS" )
+                           || dirs . Contains ( "DOCUMENTATION" ) || dirs . Contains ( "IMAGES" ) || dirs . Contains ( "PRINTFILES" )
+                            || dirs . Contains ( "SQLSCRIPTS" ) || dirs . Contains ( "USERDATAFILES" )
+                           )
+                        continue;
+                    else
+                        FulldirectoriesList . Add ( dirInfo . FullName );
+                    // Resursive call for each subdirectory.
+                    WalkDirectoryTree ( dirInfo , filespec );
+                }
+            }
+            return filesindex;
         }
+        private static void AddFilesToList ( FileInfo [ ] files , ref int filesindex )
+        {
+            foreach ( System . IO . FileInfo fi in files )
+            {
+                // If we want to open, delete or modify the file, then
+                // thea try-catch block is required here to handle the case
+                // where the file has been deleted since the call to TraverseTree().
+
+                string Files = fi . FullName . ToUpper ( );
+                if ( Files . Contains ( ".G.CS" ) || Files . Contains ( "ASSEMBLY" ) || Files . Contains ( ".TXT" ) || Files . Contains ( ".DAT" ) )
+                    continue;
+                else
+                {
+                    AllFileNames [ filesindex++ ] = fi . Name;
+                    FullPathFileNameList . Add ( fi . FullName );
+
+                }
+            }
+        }
+
+        private static int DoSetup ( string argstring )
+        {
+            DirectoryInfo di = new ( argstring );
+            TotalFiles = WalkDirectoryTree ( di , filespec );
+            if ( TotalFiles == 0 )
+            {
+                return 0;
+            }
+            //FilesArray mirrors AllFilesList, BUT it holds the file name only
+            // whereas AllFilesList holds  fully qualified path+name
+            string [ ] tmparray = new string [ TotalFiles ];
+            for ( int i = 0 ; i < TotalFiles ; i++ )
+                tmparray [ i ] = AllFileNames [ i ];
+            // list of file names only
+            AllFileNames = tmparray;
+
+            // list of Path+file names 
+            pathfilename = FullPathFileNameList [ 0 ];
+            TotalFiles = FullPathFileNameList . Count;
+            searchpath = argstring;
+            return TotalFiles;
+        }
+
+        private static void CreateDupesFile ( )
+        {
+            //StringBuilder sbMethods = new ( );
+            //string buff = $"RESULTS - DUPLICATED METHOD NAMES\n\nThis List should be a fairly comprehensive list of all duplicated Methods identified in the C# files in {searchpath}.\n\n";
+            //sbMethods . Append ( buff );
+            //sbMethods . Append ( $"Report Created : {DateTime . Now . ToString ( )}\n\n" );
+            //sbMethods . Append ( $"FILENAME = C:\\Wpfmain\\Documentation\\MethodsIndex . txt,\n\n" );
+
+            //sbMethods . Append ( $"ERRORS - DUPLICATE METHOD NAMES\n" );
+            //sbMethods . Append ( $"Report Created : {DateTime . Now . ToString ( )}\n" );
+            //sbMethods . Append ( $"Current file :{pathfilename}\n\n" );
+
+            //if ( ErrorPaths . Count > 0 )
+            //{
+            //    int indx = 0;
+            //    Tuple<int , string , string> [ ] tuples = new Tuple<int , string , string> [ ErrorPaths . Count ];
+
+            //    // Add current source file to top of list
+            //    foreach ( Tuple<int , string , string> item in ErrorPaths )
+            //    {
+            //        Tuple<int , string , string> currenttuple = Tuple . Create ( item . Item1 , item . Item2 , item . Item3 );
+            //        List<Tuple<int , string , string>> matches = Utilities . FindAllDupeMatches ( ErrorPaths: ErrorPaths , currenttuple );
+            //        tuples [ indx++ ] = Tuple . Create ( item . Item1 , item . Item2 , item . Item3 );
+            //    }
+
+
+            //    // Now sort  the tuples              
+            //    Array . Sort ( tuples , new SortTupleItem2 ( ) );
+
+            //    // now add them to StringBuilder 
+            //    for ( int x = 0 ; x < tuples . Length ; x++ )
+            //    {
+            //        Tuple<int , string , string> tup = tuples [ x ];
+            //        if ( x == 0 )
+            //            sbMethods . Append ( $"\n{tup . Item3}\n" );
+            //        else
+            //            sbMethods . Append ( $"     {tup . Item2} : Line {tup . Item1}\n" );
+            //    }
+            //}
+            //File . WriteAllText ( $@"C:\wpfmain\Documentation\Duplicateslist.txt" , sbMethods . ToString ( ) );
+            //Utilities . SortDupes ( ErrorPaths );
+        }
+        public static int ParseAllMethodArgs ( string [ ] lines , string filepathname , int x , ref string [ ] proclines )
+        {
+            string arglines = "", buffer = "";
+            int ndx = 0, outndx = 0;
+            string [ ] parts2;
+            string [ ] outbuff = new string [ 30 ]; ;
+            bool isfirst = true, breakout = false;
+
+            while ( true )
+            {
+                //read lines in until we have the complete set of arguments
+                string s = lines [ x + ndx++ ] . Trim ( );
+                if ( isfirst )
+                    parts2 = s . Split ( "(" );
+                else
+                    parts2 = s . Split ( "," );
+                for ( int z = 0 ; z < parts2 . Length ; z++ )
+                {
+                    if ( isfirst )
+                    {
+                        // add filepathname  1st
+                        outbuff [ outndx++ ] += $"{filepathname}";
+                        if ( z == 0 && parts2 [ z ] . Trim ( ) . Contains ( "(" ) == false )
+                            outbuff [ outndx++ ] = $"{parts2 [ z ] . Trim ( )}(";
+                        else
+                            outbuff [ outndx++ ] = $"{parts2 [ z ] . Trim ( )}";
+                    }
+                    else
+                        outbuff [ outndx++ ] = $"{parts2 [ z ] . Trim ( )}";
+                    isfirst = false;
+                }
+
+                if ( outbuff [ outndx - 1 ] . Trim ( ) . EndsWith ( ")" ) )
+                    break;
+            }
+            // create string[] the correct size to return to caller
+            proclines = new string [ outndx ];
+
+            for ( int z = 0 ; z < outndx ; z++ )
+            {
+                proclines [ z ] = outbuff [ z ] . Trim ( );
+            }
+            return ndx;
+        }
+
     }
 }

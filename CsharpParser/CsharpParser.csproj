@@ -7,4 +7,19 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="SortSupport.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="SortSupportLib.dll" />
+    <None Remove="SortSupportLib.pdb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="SortSupportLib">
+      <HintPath>..\..\..\..\..\..\SortSupportLib\SortSupportLib\bin\Debug\net6.0-windows\SortSupportLib.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>
