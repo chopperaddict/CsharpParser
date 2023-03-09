@@ -32,7 +32,7 @@ namespace CsharpParser
                 Tuple<int , string , string> [ ] tuples = new Tuple<int , string , string> [ Program . ErrorPaths . Count ];
 
                 // Add current source file to top of list
-                foreach ( Tuple<int , string , string> item in  Program . ErrorPaths )
+                foreach ( Tuple<int , string , string> item in Program . ErrorPaths )
                 {
                     Tuple<int , string , string> currenttuple = Tuple . Create ( item . Item1 , item . Item2 , item . Item3 );
                     List<Tuple<int , string , string>> matches = Utilities . FindAllDupeMatches ( ErrorPaths: Program . ErrorPaths , currenttuple );
@@ -180,11 +180,11 @@ namespace CsharpParser
             Program . TotalMethods = 0;
             File . WriteAllText ( path , "" );
 
-            foreach ( Tuple<int , string , string , string [ ]> item in Program.AllTupesList)
+            foreach ( Tuple<int , string , string , string [ ]> item in Program . AllTupesList )
             {
                 if ( item == null )
                     break;
-                Tuple<int , string , string , string [ ]>  AllTuples = item;
+                Tuple<int , string , string , string [ ]> AllTuples = item;
                 Debug . Assert ( AllTuples . Item4 [ 0 ] != "GetBankAccounts" , "GetBankAccounts identified" , "did it work ?" );
                 Program . TotalMethods++;
                 // layout required :
@@ -200,27 +200,29 @@ namespace CsharpParser
                 string Lineno = $"{AllTuples . Item1}";  // line #
                 string Filename = $"{AllTuples . Item3}";    // Source file name
                 string FilenameLine = $"\n({linecount++}) Ln# {AllTuples . Item1} : {AllTuples . Item3}";  // file name + line #
-                int argscount = 0, count=0;
-                string [ ] args =new string [ 1 ];
+                int argscount = 0, count = 0;
+                string [ ] args = new string [ 1 ];
                 string Procname = $"{AllTuples . Item4 [ 0 ]});";// procedure name (from Item4[0])
-                for(int x = 0 ; x < AllTuples . Item4 .Length ; x++ )
+                Debug . Assert ( Procname .Contains ( "GetBankDataAsObsCollectionAsync")==false ,"","");
+  
+                // ensure we have the correct count of arguments
+                for ( int x = 0 ; x < AllTuples . Item4 . Length ; x++ )
                 {
-                    if ( AllTuples . Item4 [x] != null )
+                    if ( AllTuples . Item4 [ x ] != null )
                         argscount++;
                     else break;
                 }
-
                 if ( argscount == 1 )
                 {   //No arguments
-                    if ( AllTuples . Item4 [ 0 ] . Trim ( ) . Contains ( ",") == false )
+                    if ( AllTuples . Item4 [ 0 ] . Trim ( ) . Contains ( "," ) == false )
                         Procname = $"{AllTuples . Item4 [ 0 ]});";// procedure name (from Item4[0])
                     else
                     {
-                        string[] argtmp = AllTuples . Item4 [ 0 ] . Split ( "," );
+                        string [ ] argtmp = AllTuples . Item4 [ 0 ] . Split ( "," );
                         count = 0;
                         argscount = argtmp . Length;
-                        args = new string [ argscount ];  
-                       for(int y = 0 ; y < argscount ; y++ )
+                        args = new string [ argscount ];
+                        for ( int y = 0 ; y < argscount ; y++ )
                         {
                             args [ y ] = argtmp [ y ];
                         }
@@ -239,21 +241,36 @@ namespace CsharpParser
                             if ( AllTuples . Item4 [ 0 ] . Trim ( ) . EndsWith ( "(" ) == false )
                                 args [ 0 ] = AllTuples . Item4 [ 0 ] + "(\n";        // output FULL line
                             else
-                            args [ p  ] = AllTuples . Item4 [ p ];
+                                args [ p ] = AllTuples . Item4 [ p ];
                         }
-                        if ( args [ argscount-1 ] . Trim ( ) . EndsWith ( ")" ) == false )
+                        if ( args [ argscount - 1 ] . Trim ( ) . EndsWith ( ")" ) == false )
                             args [ argscount - 1 ] += ");";
                     }
                 }
-                File . AppendAllText ( path , $"{FilenameLine}\n" );
-                File . AppendAllText ( path , $"  {Procname}\n" );
+                Debug . Assert ( Procname . Contains ( "public static async Task<ObservableCollection<BankAccountViewModel>> GetBankDataAsObsCollectionAsync ()")== false , "" , "" );
+                File . AppendAllText ( path , $"\n{FilenameLine . Trim ( )}\n" );
 
                 for ( int t = 0 ; t < argscount ; t++ )
                 {
                     if ( t < argscount - 1 )
-                        File . AppendAllText ( path , $"    {args [ t ]},\n" );
+                    {
+                        if ( args [ t ] == null )
+                            continue;
+                        if ( t == 0 )
+                            File . AppendAllText ( path , $"    {args [ t ]}\n" );
+                        else
+                            File . AppendAllText ( path , $"    {args [ t ] . Trim ( )},\n" );
+                    }
+
                     else
-                        File . AppendAllText ( path , $"    {args [ t ]});\n" );
+                    {
+                        if ( args [ t ] == null )
+                            continue;
+                        if ( args [t].Trim().EndsWith(")") == false)
+                            File . AppendAllText ( path , $"    {args [ t ].Trim()});\n" );
+                        else
+                            File . AppendAllText ( path , $"    {args [ t ] . Trim ( )};\n" );
+                    }
                 }
             }
             File . AppendAllText ( path , $"\nE.O.F : Created : {DateTime . Now}" );   // arguments
@@ -268,110 +285,112 @@ namespace CsharpParser
         }
         public static void CreatefullReportFile ( )
         {
-            string path = @"C:\wpfmain\documentation\AllTuples.txt";
-            string dt = File . ReadAllText ( path );
-            string [ ] data = dt . Split ( "\n" );
-            string line = "";
-            string output = "";
-            string [ ] sarray = new string [ 1 ];
-            string proc = "", spath = "";
-            Program . TotalMethods = 0;
-            Tuple<int , string , string , string [ ]> tuple = new Tuple<int , string , string , string [ ]> ( 0 , "" , "" , sarray );
-            Tuple<int , string , string , string [ ]> [ ] Alltuples = new Tuple<int , string , string , string [ ]> [ Program . AllProcsIindex ];
-            // Array [ , ] array = new Array [ Program . AllProcnames . Count , 1 ];
-            // parse the tuples data file to create our report
-            foreach ( string item in data )
-            {
-                // Sanity check
-                if ( item == "" )
-                    continue;
-                string [ ] parts = item . Split ( " : " );
-                line = parts [ 0 ] . ToString ( );
-                spath = parts [ 1 ] . Trim ( );
-                proc = parts [ 2 ] . Trim ( );
+            //***************************************//
+            // This is   the MAIN ALLTUPLES report
+            //***************************************//
+            //string path = @"C:\wpfmain\documentation\AllTuples.txt";
+            //string dt = File . ReadAllText ( path );
+            //string [ ] data = dt . Split ( "\n" );
+            //string line = "";
+            //string output = "";
+            //string [ ] sarray = new string [ 1 ];
+            //string proc = "", spath = "";
+            //Program . TotalMethods = 0;
+            //Tuple<int , string , string , string [ ]> tuple = new Tuple<int , string , string , string [ ]> ( 0 , "" , "" , sarray );
+            //Tuple<int , string , string , string [ ]> [ ] Alltuples = new Tuple<int , string , string , string [ ]> [ Program . AllProcsIindex ];
+            //// parse the tuples data file to create our report
+            //foreach ( string item in data )
+            //{
+            //    // Sanity check
+            //    if ( item == "" )
+            //        continue;
+            //    string [ ] parts = item . Split ( " : " );
+            //    line = parts [ 0 ] . ToString ( );
+            //    spath = parts [ 1 ] . Trim ( );
+            //    proc = parts [ 2 ] . Trim ( );
 
-                // ouput file details
+            //    // ouput file details
 
-                if ( proc . Contains ( "(" ) == true && proc . Contains ( ")" ) == true
-                    || proc . Contains ( "(" ) == true && proc . Contains ( ")" ) == false )
-                {
-                    // output the file name and line #
-                    output += $"\n{spath} : #{line}\n";
-                    File . WriteAllText ( path , output );
-                    Program . TotalMethods++;
-                }
-                if ( proc . Contains ( "," ) == false && proc . Contains ( ")" ) == true )
-                {
-                    // Zero or one argument - output it all on one line
-                    output += $"\t{proc}\n";
-                    File . WriteAllText ( path , output );
-                    continue;
-                }
-                if ( proc . Contains ( "," ) == true )
-                {
-                    // looks like we havemmre than one argument
-                    string [ ] mainargs = proc . Split ( "," );
-                    if ( mainargs . Length > 1 )
-                    {
-                        string [ ] args = proc . Split ( "(" );
-                        if ( args . Length == 1 )
-                        {
-                            output = $"\t{args [ 0 ]}";
-                            File . WriteAllText ( path , output );
-                            continue;
-                        }
-                        else
-                        {
-                            string [ ] balargs = args [ 1 ] . Split ( "," );
-                            for ( int z = 0 ; z < balargs . Length ; z++ )
-                            {
-                                output += $"\t{balargs [ z ]}\n";
-                            }
-                            if ( output . Trim ( ) . EndsWith ( ")" ) == false )
-                                output = $"{output . Substring ( 0 , output . Length - 1 )} )\n";
-                            File . WriteAllText ( path , output );
-                            continue;
-                        }
-                    }
-                }
-            }
-            string outfile = File . ReadAllText ( path );
-            string hdr = $"Thiis file contains ALL the Procedures identified in the set of files selected\n"
-                + $"A Toal of {Program . TotalFiles} files have been processed,\ncontaining {Program . TotalLines} lines of code.\n\n"
-                + $"Thiis file contains ALL the Procedures identified in the set of files selected\n"
-                + $"A Total of {Program . TotalMethods} Procedures were identified & are listed below :-"
-                + $"\nDate Created : {DateTime . Now . ToString ( )}\n\n";
-            File . WriteAllText ( path , hdr );
-            File . AppendAllText ( path , outfile );
-            File . AppendAllText ( path , "\n\n*** END OF FILE ***" );
-            string lineno = "", Filename = "", Procname = "";
-            int tupleindx = 0;
-            for ( int y = 0 ; y < Program . AllProcsIindex ; y++ )
-            {
-                Tuple<int , string , string , string [ ]> t = Program . Alltuples [ y ];
-                int a = t . Item1;
-                string numstr = t . Item2;
-                string pathname = t . Item3;
-                string [ ] b = t . Item4;
+            //    if ( proc . Contains ( "(" ) == true && proc . Contains ( ")" ) == true
+            //        || proc . Contains ( "(" ) == true && proc . Contains ( ")" ) == false )
+            //    {
+            //        // output the file name and line #
+            //        output += $"\n{spath} : #{line}\n";
+            //        File . WriteAllText ( path , output );
+            //        Program . TotalMethods++;
+            //    }
+            //    if ( proc . Contains ( "," ) == false && proc . Contains ( ")" ) == true )
+            //    {
+            //        // Zero or one argument - output it all on one line
+            //        output += $"\t{proc}\n";
+            //        File . WriteAllText ( path , output );
+            //        continue;
+            //    }
+            //    if ( proc . Contains ( "," ) == true )
+            //    {
+            //        // looks like we havemmre than one argument
+            //        string [ ] mainargs = proc . Split ( "," );
+            //        if ( mainargs . Length > 1 )
+            //        {
+            //            string [ ] args = proc . Split ( "(" );
+            //            if ( args . Length == 1 )
+            //            {
+            //                output = $"\t{args [ 0 ]}";
+            //                File . WriteAllText ( path , output );
+            //                continue;
+            //            }
+            //            else
+            //            {
+            //                string [ ] balargs = args [ 1 ] . Split ( "," );
+            //                for ( int z = 0 ; z < balargs . Length ; z++ )
+            //                {
+            //                    output += $"\t{balargs [ z ]}\n";
+            //                }
+            //                if ( output . Trim ( ) . EndsWith ( ")" ) == false )
+            //                    output = $"{output . Substring ( 0 , output . Length - 1 )})\n";
+            //                File . WriteAllText ( path , output );
+            //                continue;
+            //            }
+            //        }
+            //    }
+            //}
+            //string outfile = File . ReadAllText ( path );
+            //string hdr = $"Thiis file contains ALL the Procedures identified in the set of files selected\n"
+            //    + $"A Toal of {Program . TotalFiles} files have been processed,\ncontaining {Program . TotalLines} lines of code.\n\n"
+            //    + $"Thiis file contains ALL the Procedures identified in the set of files selected\n"
+            //    + $"A Total of {Program . TotalMethods} Procedures were identified & are listed below :-"
+            //    + $"\nDate Created : {DateTime . Now . ToString ( )}\n\n";
+            //File . WriteAllText ( path , hdr );
+            //File . AppendAllText ( path , outfile );
+            //File . AppendAllText ( path , "\n\n*** END OF FILE ***" );
+            //string lineno = "", Filename = "", Procname = "";
+            //int tupleindx = 0;
+            //for ( int y = 0 ; y < Program . AllProcsIindex ; y++ )
+            //{
+            //    Tuple<int , string , string , string [ ]> t = Program . Alltuples [ y ];
+            //    int a = t . Item1;
+            //    string numstr = t . Item2;
+            //    string pathname = t . Item3;
+            //    string [ ] b = t . Item4;
 
-                tuple = Tuple . Create ( a , numstr , pathname , b );
-                Alltuples [ tupleindx++ ] = tuple;
-                //array [ 0 ] [0] = tuple .Item1, tuple.Item2;
-            }
-            // Now sort  the tuples
-            Array . Sort ( Alltuples , new SortTupleIntStringOnInt ( ) );
-            foreach ( Tuple<int , string , string , string [ ]> item in Alltuples )
-            {
-                Debug . WriteLine ( $"\n{item . Item2} : {item . Item1}" );
-                foreach ( string itm in item . Item4 )
-                {
-                    if ( itm != ")" )
-                        Debug . WriteLine ( $"\t\t{itm}" );
-                }
-            }
+            //    tuple = Tuple . Create ( a , numstr , pathname , b );
+            //    Alltuples [ tupleindx++ ] = tuple;
+            //    //array [ 0 ] [0] = tuple .Item1, tuple.Item2;
+            //}
+            //// Now sort  the tuples
+            //Array . Sort ( Alltuples , new SortTupleIntStringOnInt ( ) );
+            //foreach ( Tuple<int , string , string , string [ ]> item in Alltuples )
+            //{
+            //    Debug . WriteLine ( $"\n{item . Item2} : {item . Item1}" );
+            //    foreach ( string itm in item . Item4 )
+            //    {
+            //        if ( itm != ")" )
+            //            Debug . WriteLine ( $"\t\t{itm}" );
+            //    }
+            //}
 
-            //tuples must a tuples[] array
-            // Array . Sort(tuples, new SortTupleItem2 ( ) );
+            ////tuples must a tuples[] array
+            //// Array . Sort(tuples, new SortTupleItem2 ( ) );
 
         }
         public static void DoReporting ( )

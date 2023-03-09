@@ -255,8 +255,9 @@ namespace CsharpParser
 
                         //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^//
                         if ( SHOWASSERT )
-                            Debug . Assert ( lines [ x ] . Contains ( "public static ContextMenu RemoveMenuItems" ) == false , "public static void Track" , "" );
-                        //Debug . Assert ( x == 210 == false );
+                            //Debug . Assert ( x != 257, "public static void Track" , "" );
+                            if ( x > 250 && x < 260 )
+                                Debug . WriteLine ( x );
                         //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^//
 
                         if ( found == true )
@@ -280,19 +281,20 @@ namespace CsharpParser
                                 }
                             }
                             else
+                            {
                                 Datastore . AddProcRow ( x , $"{lines [ x ]}" , pathfilename , type , isArg: true , crlf: 1 );
 
-                            string [ ] rows = ParselinesFromProcedure ( lines , type , ref x );
-                            for ( int y = 0 ; y < rows . Length ; y++ )
-                            {
-                                rows [ y ] = Datastore . StripFormattingChars ( rows [ y ] . Trim ( ) );
-                                // dont fall past end of method declaration
-                                if ( rows [ y ] != "{" )
-                                    Datastore . AddProcRow ( x , $"{rows [ y ]}" , pathfilename , type , isArg: true , crlf: 1 );
-                                if ( y == rows . Length - 1 )
-                                {
-                                    break;
-                                }
+                                //string [ ] rows = ParselinesFromProcedure ( lines , type , ref x );
+                                //for ( int y = 0 ; y < rows . Length ; y++ )
+                                //{
+                                //    rows [ y ] = Datastore . StripFormattingChars ( rows [ y ] . Trim ( ) );
+                                //    // dont fall past end of method declaration
+                                //    if ( rows [ y ] != "{" )
+                                //        Datastore . AddProcRow ( x , $"{rows [ y ]}" , pathfilename , type , isArg: true , crlf: 1 );
+                                //    if ( y == rows . Length - 1 )
+                                //    {
+                                //        break;
+                                //    }
                             }
                             found = false;
                             continue;
@@ -366,18 +368,19 @@ namespace CsharpParser
                                 // TODO this is where AddProcname fails
                                 try
                                 {
-                                    if ( Datastore . AddProcname ( x , FullOutputLine , pathfilename , type , fullMethod: proclines ) == false )
+                                    bool result = Datastore . AddProcname ( x , FullOutputLine , pathfilename , type , fullMethod: proclines );
+                                    if ( result == false )
                                     {
                                         Debug . WriteLine ( $"Failed to AddProcname line 325 : Line {lines [ x ]}" );//TODO  handle error
                                         Tuple<int , string , string> dbugtuple = Tuple . Create ( 325 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
                                         Program . DebugErrors . Add ( dbugtuple );
                                         x += indexincrement;
-                                        //continue;
+                                        continue;
                                     }
                                     else
                                     {
                                         x += indexincrement;
-                                        //continue;
+                                        continue;
                                     }
                                 }
                                 catch ( Exception ex )
@@ -422,13 +425,12 @@ namespace CsharpParser
                                             ErrorPaths . Add ( tuple );
                                             TotalExErrors++;
                                             x += indexincrement;
-
-                                            //continue;
+                                            continue;
                                         }
                                         else
                                         {
                                             x += indexincrement;
-                                            //continue;
+                                            continue;
                                         }
                                     }
                                     catch ( Exception ex )
@@ -504,12 +506,12 @@ namespace CsharpParser
                                                 ErrorPaths . Add ( tuple );
                                                 TotalExErrors++;
                                                 x += indexincrement;
-                                                //continue;
+                                                continue;
                                             }
                                             else
                                             {
                                                 x += indexincrement;
-                                                //continue;
+                                                continue;
                                             }
                                         }
                                         catch ( Exception ex )
@@ -623,12 +625,12 @@ namespace CsharpParser
                                         ErrorPaths . Add ( tuple );
                                         TotalExErrors++;
                                         x += indexincrement;
-                                        //continue;
+                                        continue;
                                     }
                                     else
                                     {
                                         x += indexincrement;
-                                        //continue;
+                                        continue;
                                     }
                                 }
                                 catch ( Exception ex )
@@ -644,33 +646,33 @@ namespace CsharpParser
                                 }
                                 continue;
 
-                                try
-                                {
-                                    rows = ParselinesFromProcedure ( lines , type , ref x );
-                                    for ( int y = 0 ; y < rows . Length ; y++ )
-                                    {
-                                        rows [ y ] = Datastore . StripFormattingChars ( rows [ y ] . Trim ( ) );
-                                        if ( y == rows . Length - 1 )
-                                            Datastore . AddProcRow ( x , $"{rows [ y ]}" , pathfilename , type , isArg: true , crlf: 2 );
-                                        else
-                                            Datastore . AddProcRow ( x , $"{rows [ y ]}" , pathfilename , type , isArg: true , crlf: 1 );
+                                //try
+                                //{
+                                //    rows = ParselinesFromProcedure ( lines , type , ref x );
+                                //    for ( int y = 0 ; y < rows . Length ; y++ )
+                                //    {
+                                //        rows [ y ] = Datastore . StripFormattingChars ( rows [ y ] . Trim ( ) );
+                                //        if ( y == rows . Length - 1 )
+                                //            Datastore . AddProcRow ( x , $"{rows [ y ]}" , pathfilename , type , isArg: true , crlf: 2 );
+                                //        else
+                                //            Datastore . AddProcRow ( x , $"{rows [ y ]}" , pathfilename , type , isArg: true , crlf: 1 );
 
-                                        if ( y == rows . Length - 1 )
-                                        {
-                                            found = false;
-                                            break;
-                                        }
-                                    }
-                                }
-                                catch ( Exception ex )
-                                {
-                                    //Add entry to Error Tuple collection 
-                                    string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
-                                    Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
-                                    Program . DebugErrors . Add ( t );
-                                    Debug . WriteLine ( $"Error line 497 {lines [ x ]}\n{ex . Message}" );
-                                }
-                                continue;
+                                //        if ( y == rows . Length - 1 )
+                                //        {
+                                //            found = false;
+                                //            break;
+                                //        }
+                                //    }
+                                //}
+                                //catch ( Exception ex )
+                                //{
+                                //    //Add entry to Error Tuple collection 
+                                //    string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                                //    Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                                //    Program . DebugErrors . Add ( t );
+                                //    Debug . WriteLine ( $"Error line 497 {lines [ x ]}\n{ex . Message}" );
+                                //}
+                                //continue;
                             }
                         }
                     }

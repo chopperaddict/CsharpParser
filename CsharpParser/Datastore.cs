@@ -27,6 +27,10 @@ namespace CsharpParser
                 if ( splitter . Length == 1 )
                     return false;
 
+                Debug . Assert ( fullMethod [ 0 ] . Contains ( "GetBankDataAsObsCollectionAsync" ) == false , "" , "" );
+                Debug . Assert ( fullMethod [ 1 ] . Contains ( "GetBankDataAsObsCollectionAsync" ) == false , "" , "" );
+                Debug . Assert ( fullMethod [ 2 ] . Contains ( "GetBankDataAsObsCollectionAsync" ) == false , "" , "" );
+
                 string [ ] argumentsalone = new string [ procargs . Length - 1 ];
                 // add procedure name to row zero
                 argumentsalone [ 0 ] = procargs [ 1 ];
