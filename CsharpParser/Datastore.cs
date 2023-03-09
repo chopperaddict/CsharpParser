@@ -23,33 +23,21 @@ namespace CsharpParser
             {
                 // We have the entire procedure call in string[] fullMethod
                 procargs = fullMethod;
-                splitter = procargs[1].Trim() . Split ( "(" );
+                splitter = procargs [ 1 ] . Trim ( ) . Split ( "(" );
                 if ( splitter . Length == 1 )
                     return false;
 
-                //for ( int y = 0 ; y < fullMethod . Length ; y++ )
-                //{
-                //    if ( y == 0)
-                //    {
-                //        procargs [ y ] = fullMethod [ y ] . Substring ( 0 , procargs [ y ] . Length - 1 );
-                //    }
-                //    else
-                //    procargs [ y ] = fullMethod [ y ] . Trim ( );
-                //}
                 string [ ] argumentsalone = new string [ procargs . Length - 1 ];
                 // add procedure name to row zero
-                argumentsalone [ 0 ] = procargs [ 1];
-                for (int y = 1 ; y < procargs.Length - 1 ; y++ )
+                argumentsalone [ 0 ] = procargs [ 1 ];
+                for ( int y = 1 ; y < procargs . Length - 1 ; y++ )
                 {
-                    //if(y != 2)
-                    //    argumentsalone [ y-1 ] = procargs [ y  ];
-                    //else
-                        argumentsalone [ y ] = procargs [ y+1 ];
-
+                    argumentsalone [ y ] = procargs [ y + 1 ];
                 }
-                Tuple<int , string , string , string [ ]> t = Tuple . Create ( lineindex , procargs [1] , procargs [ 0 ] , argumentsalone );
+                Tuple<int , string , string , string [ ]> t = Tuple . Create ( lineindex , procargs [ 1 ] , procargs [ 0 ] , argumentsalone );
                 Program . Alltuples [ Program . AllProcsIindex++ ] = t;
-
+                Program . AllTupesList . Add ( t );
+                return true;
             }
             else
             {
@@ -65,28 +53,32 @@ namespace CsharpParser
                     return false;
                 string arguments = splitter [ 1 ];
                 procargs = arguments . Split ( "," );
-            }
-            try
-            {
-                for ( int y = 0 ; y < procargs . Length ; y++ )
+                try
                 {
-                    if ( procargs [ y ] . EndsWith ( ")" ) )
+                    for ( int y = 0 ; y < procargs . Length ; y++ )
                     {
-                        procargs [ y ] = procargs [ y ] . Substring ( 0 , procargs [ y ] . Length - 1 );
+                        if ( procargs [ y ] . EndsWith ( ")" ) )
+                        {
+                            procargs [ y ] = procargs [ y ] . Substring ( 0 , procargs [ y ] . Length - 1 );
+                        }
+                        procargs [ y ] = procargs [ y ] . Trim ( );
                     }
-                    procargs [ y ] = procargs [ y ] . Trim ( );
+                    string [ ] split1 = procargs [ 1 ] . Split ( "(" );
+                    //AllProcnames is a Tuple<int, string, string[]>
+                    // FORMAT = int line # - string Procedure name (NO "(") - string filepathname - string[] procargs
+                    // NB:  procargs last line does NOT have the ")" in it either
+                    Tuple<int , string , string , string [ ]> t = Tuple . Create ( lineindex , split1 [ 0 ] , pathfilename , procargs );
+                    Program . Alltuples [ Program . AllProcsIindex++ ] = t;
+                    Program . AllTupesList . Add ( t );
+                    return true;
                 }
-                string [ ] split1 = procargs [ 1 ] . Split ( "(" );
-                //AllProcnames is a Tuple<int, string, string[]>
-                // FORMAT = int line # - string Procedure name (NO "(") - string filepathname - string[] procargs
-                // NB:  procargs last line does NOT have the ")" in it either
-                Tuple<int , string , string , string [ ]> t = Tuple . Create ( lineindex , split1 [ 0 ] , pathfilename , procargs );
-                Program . Alltuples [ Program . AllProcsIindex++ ] = t;
-                return true;
-            }catch(Exception ex) {
-                Debug . WriteLine ( $"ERROR line 42, {ex.Message}" );
-                return false;
+                catch ( Exception ex )
+                {
+                    Debug . WriteLine ( $"ERROR line 42, {ex . Message}" );
+                    return false;
+                }
             }
+            return false;
         }
         public static bool AddProcRow ( int x , string line , string path , int type ,
               bool isAlone = false , bool isArg = false ,
@@ -149,7 +141,7 @@ namespace CsharpParser
             {
                 //Add entry to Error Tuple collection 
                 Tuple<int , string , string> t = Tuple . Create ( x , path , parts [ 0 ] );
-                Program . ErrorPaths . Add ( t );
+                Program . DebugErrors. Add ( t );
 
                 Debug . WriteLine ( $"\nErrorPaths updated with {x} : {parts [ 0 ]} : {path}" );
                 return false;

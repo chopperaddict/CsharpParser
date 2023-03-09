@@ -101,11 +101,11 @@ namespace CsharpParser
             }
             return false;
         }
-        public static bool CreateOneLineItem ( Dictionary<string , string> AllMethods , string pathfilename , string ProcName ,  int type , int x )
-        {
-            string FullOutputLine = $"{pathfilename} : {ProcName} : {x}";
-            bool result = Datastore . AddProcname ( x , FullOutputLine , pathfilename , type );
-            return result;
-        }
+        //public static bool CreateOneLineItem ( Dictionary<string , string> AllMethods , string pathfilename , string ProcName ,  int type , int x )
+        //{
+        //    string FullOutputLine = $"{pathfilename} : {ProcName} : {x}";
+        //    bool result = Datastore . AddProcname ( x , FullOutputLine , pathfilename , type );
+        //    return result;
+        //}
     }
 }

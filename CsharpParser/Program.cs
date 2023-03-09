@@ -14,16 +14,18 @@ namespace CsharpParser
     #region declarations
     internal class Program
     {
-        public static bool LOGFILENAMES = false;
-        public static bool SHOWASSERT = false;
+        public static bool LOGFILENAMES = true;
+        public static bool SHOWASSERT = true;
 
         public static int TotalFiles = 0;
+        public static int indexincrement = 0;
         public static int TotalLines = 0;
         public static int TotalMethods = 0;
         public static int TotalExErrors = 0;
         public static int atch = 0;
         public static int linescount = 0;
         public static bool found = false;
+        public static bool isfullcomment = false;
         public static string path = "";
         public static string? searchpath;
         public static string FullOutputLine = "";
@@ -52,12 +54,13 @@ namespace CsharpParser
         public static Dictionary<string , string> AllMethods = new ( );
         //public static Dictionary<int , string> Errormethods = new ( );
         public static Tuple<int , string? , string?>? tuple;
-        public static List<Tuple<int , string? , string?>>DebugErrors = new ( );
+        public static List<Tuple<int , string? , string?>> DebugErrors = new ( );
         public static List<Tuple<int , string , string>> ErrorPaths = new ( );
         public static List<Tuple<int , string , string>> AllValidEntries = new ( );
 
         // declare tuple array (dummy size = 5000) !!
         public static Tuple<int , string , string , string [ ]> [ ] Alltuples = new Tuple<int , string , string , string [ ]> [ 5000 ];
+        public static List<Tuple<int , string , string , string [ ]>> AllTupesList = new ( );
         public static int AllProcsIindex = 0;
 
         public static int tbindex { get; set; }
@@ -179,6 +182,9 @@ namespace CsharpParser
             File . WriteAllText ( $@"C:\wpfmain\documentation\AllMethods.txt" , "" );
             File . WriteAllText ( $@"C:\wpfmain\documentation\Duplicateslist.txt" , "" );
             File . WriteAllText ( @"C:\wpfmain\documentation\AllTuples.txt" , "" ); ;
+            File . WriteAllText ( @"C:\wpfmain\documentation\allLines.txt" , $"" );
+            File . WriteAllText ( @"C:\wpfmain\documentation\allDebugerrors.txt" , $"" );
+
 
             #endregion setup
 
@@ -191,7 +197,7 @@ namespace CsharpParser
                 pathfilename = FullPathFileNameList [ z ];
                 CurrentFile = pathfilename;
                 if ( LOGFILENAMES )
-                    Debug . Write ( $"\nParsing {CurrentFile . Trim ( )}" );
+                    Console . WriteLine ( $"\nParsing {CurrentFile . Trim ( )}" );
                 // read current file into memory
                 buffer = File . ReadAllText ( FullPathFileNameList [ z ] );
                 capsbuffer = buffer . ToUpper ( );
@@ -208,14 +214,32 @@ namespace CsharpParser
                     if ( IsDupe )
                         x--;
                     //if ( x % 25 == 0 )
-                    //    Debug . Write ( "." );
+                    //Debug . Write ( "" );
                     try
                     {
                         lines [ x ] = Datastore . StripFormattingChars ( lines [ x ] );
+                        lines [ x ] = lines [ x ] . Trim ( );
+                        upperline = lines [ x ] . ToUpper ( );
+                        upperlines [ x ] = upperlines [ x ] . Trim ( );
                         if ( upperlines [ x ] . Length < 10 )
                             continue;
-                        lines [ x ] = lines [ x ] . Trim ( );
-                        upperlines [ x ] = upperlines [ x ] . Trim ( );
+
+                        // Check for commented code
+                        if ( isfullcomment && lines [ x ] . Trim ( ) . EndsWith ( "*/" ) == false )
+                            continue;
+                        else if ( isfullcomment && lines [ x ] . Trim ( ) . EndsWith ( "*/" ) == true )
+                        {
+                            isfullcomment = false;
+                            continue;
+                        }
+                        if ( lines [ x ] . Trim ( ) . StartsWith ( "//" ) )
+                            continue;
+                        if ( lines [ x ] . Trim ( ) . StartsWith ( "/*" ) || lines [ x ] . Trim ( ) . StartsWith ( "*" ) )
+                        {
+                            isfullcomment = true;
+                            continue;
+                        }
+                        // No more commented lines found
 
                         #region Validate it is a procedure
                         if ( found == false )
@@ -231,7 +255,7 @@ namespace CsharpParser
 
                         //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^//
                         if ( SHOWASSERT )
-                            Debug . Assert ( lines [ x ] . Contains ( "GetBankAccounts" ) == false , "Found GetBankAccounts" , "" );
+                            Debug . Assert ( lines [ x ] . Contains ( "public static ContextMenu RemoveMenuItems" ) == false , "public static void Track" , "" );
                         //Debug . Assert ( x == 210 == false );
                         //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^//
 
@@ -273,14 +297,6 @@ namespace CsharpParser
                             found = false;
                             continue;
                         }
-                        //if ( DOCONTINUE )
-                        //{
-                        //    Datastore . AddProcRow ( x , $"{lines [ x ] . Trim ( )}" , pathfilename , type , isArg: true , crlf: 1 );
-                        //    $"{lines [ x ] . Trim ( )}" . log ( );
-                        //    if ( lines [ x ] . Contains ( ");" ) )
-                        //        DOCONTINUE = false;
-                        //    continue;
-                        //}
 
                         //************************//
                         // *** Main entry point  ***
@@ -298,20 +314,39 @@ namespace CsharpParser
                                 method . log ( );
                                 continue;
                             }
-                            catch ( Exception ex ) { Debug . WriteLine ( $"\nERROR Program 294, \n{ex . Message}" ); TotalExErrors++; }
+                            catch ( Exception ex )
+                            {
+                                //Add entry to Error Tuple collection 
+                                string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                                Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                                Program . DebugErrors . Add ( t );
+                                Debug . WriteLine ( $"\nERROR Program 294, \n{ex . Message}" ); TotalExErrors++;
+                            }
                         }
 
                         // START of processing the line we have got
                         if ( found == false && upperlines [ x ] . Contains ( '(' ) )
                         {
+                            //**********************************//
+                            // MAIN ENTRY POINT
                             // Got the start of a procedure ?
+                            //**********************************//
                             try
                             {
                                 //  Set storage type (Public=1/private=2/internal=3)
                                 GetStorageType ( upperline , ref type );
                             }
-                            catch ( Exception ex ) { Debug . WriteLine ( $"\nERROR Program 306, \n{ex . Message}" ); TotalExErrors++; }
-
+                            catch ( Exception ex )
+                            {
+                                //Add entry to Error Tuple collection 
+                                string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                                Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                                Program . DebugErrors . Add ( t );
+                                Debug . WriteLine ( $"\nERROR Program 306, \n{ex . Message}" ); TotalExErrors++;
+                            }
+                            //****************************************//
+                            // *** START OF PROCESSING PROPER ***
+                            //****************************************//
                             upperline = lines [ x ] . ToUpper ( );
                             lines [ x ] = Datastore . StripFormattingChars ( lines [ x ] . Trim ( ) );
                             upperlines [ x ] = lines [ x ] . Trim ( ) . ToUpper ( );
@@ -320,46 +355,95 @@ namespace CsharpParser
                                 //*****************//
                                 // Output a one liner !!
                                 //*****************//
-                                //                           Validators . CreateOneLineItem ( AllMethods , pathfilename , lines [ x ] , type , x );
                                 string FullOutputLine = $"{pathfilename} : {lines [ x ]} : {x}";
-                                
-                                if ( Datastore . AddProcname ( x , FullOutputLine , pathfilename , type ) == false )
-                                {
-                                    Debug . WriteLine ( $"Failed to AddProcname line 325 : Line {lines [ x ]}" );//TODO  handle error
-                                    Tuple<int , string , string> dbugtuple = Tuple . Create ( 325 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
-                                    Program . DebugErrors . Add ( dbugtuple );
-                                    continue;
-                                }
-                                else if ( upperlines [ x ] . Contains ( "(" ) )
-                                {
-                                    //it has "(" but no more, so probably multi argument ?
-                                    // handle method name banner line 1st
-                                    string [ ] procname = lines [ x ] . Split ( "(" );
-                                    if ( procname [ 1 ] . Trim ( ) . Contains ( "," ) == true )
-                                    {
-                                        // got multi arguments
-                                        //**************************************//
-                                        // output  header line of multi linner
-                                        //**************************************//
-                                        try
-                                        {
-                                            bool result = Datastore . AddProcname ( x , $"{procname [ 0 ]} : [ {pathfilename} ]" , pathfilename , type , isFname: true );
-                                            if ( result == false )
-                                            {
-                                                // Handle a duplicate here cos we cannot easily do it in the called procedure
-                                                Tuple<int , string , string> dbugtuple = Tuple . Create ( 345 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
-                                                Program . DebugErrors . Add ( dbugtuple );
-                                                Tuple<int , string , string> tuple = Tuple . Create ( x , path . Trim ( ) , "");
-                                                ErrorPaths . Add ( tuple );
-                                            }
-                                        }
-                                        catch ( Exception ex )
-                                        {
-                                            Debug . WriteLine ( $"\nERROR Program 345 \n{lines [ x ]} : {ex . Message}" );
-                                            TotalExErrors++;
-                                        }
 
-                                        string [ ] tmp = procname [ 1 ] . Trim ( ) . Split ( "," );
+                                string [ ] proclines = new string [ 1 ];
+                                indexincrement = ParseAllMethodArgs ( lines , pathfilename , x , ref proclines );
+                                //reset main index value to cover lines we have read in while processing in the above function
+
+                                Debug . WriteLine ( $" 1 - 360 - {x} lines[x]" );
+                                File . AppendAllText ( @"C:\wpfmain\documentation\allLines.txt" , $" 360 - {x} {lines [ x ]}\n" );
+                                // TODO this is where AddProcname fails
+                                try
+                                {
+                                    if ( Datastore . AddProcname ( x , FullOutputLine , pathfilename , type , fullMethod: proclines ) == false )
+                                    {
+                                        Debug . WriteLine ( $"Failed to AddProcname line 325 : Line {lines [ x ]}" );//TODO  handle error
+                                        Tuple<int , string , string> dbugtuple = Tuple . Create ( 325 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
+                                        Program . DebugErrors . Add ( dbugtuple );
+                                        x += indexincrement;
+                                        //continue;
+                                    }
+                                    else
+                                    {
+                                        x += indexincrement;
+                                        //continue;
+                                    }
+                                }
+                                catch ( Exception ex )
+                                {
+                                    //Add entry to Error Tuple collection 
+                                    string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                                    Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                                    Program . DebugErrors . Add ( t );
+                                    Debug . WriteLine ( $"\nERROR Program 294, \n{ex . Message}" ); TotalExErrors++;
+                                }
+
+                            }
+                            else if ( upperlines [ x ] . Contains ( "(" ) )
+                            {
+                                //it has "(" but no more, so probably multi argument ?
+                                // handle method name banner line 1st
+                                string [ ] procname = lines [ x ] . Split ( "(" );
+                                if ( procname [ 1 ] . Trim ( ) . Contains ( "," ) == true )
+                                {
+                                    // got multi arguments
+                                    Debug . WriteLine ( $" 1 - 341 - {x} lines[x]" );
+                                    File . AppendAllText ( @"C:\wpfmain\documentation\allLines.txt" , $" 341 - {x} {lines [ x ]}\n" );
+
+                                    //**************************************//
+                                    // output  header line of multi linner
+                                    //**************************************//
+                                    try
+                                    {
+                                        // TODO this is where AddProcname fails
+
+                                        string [ ] proclines = new string [ 1 ];
+                                        indexincrement = ParseAllMethodArgs ( lines , pathfilename , x , ref proclines );
+                                        //reset main index value to cover lines we have read in while processing in the above function
+
+                                        bool result = Datastore . AddProcname ( x , $"{procname [ 0 ]} : [ {pathfilename} ]" , pathfilename , type , isFname: true , fullMethod: proclines );
+                                        if ( result == false )
+                                        {
+                                            // Handle a duplicate here cos we cannot easily do it in the called procedure
+                                            Tuple<int , string , string> dbugtuple = Tuple . Create ( 345 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
+                                            Program . DebugErrors . Add ( dbugtuple );
+                                            Tuple<int , string , string> tuple = Tuple . Create ( x , path . Trim ( ) , "" );
+                                            ErrorPaths . Add ( tuple );
+                                            TotalExErrors++;
+                                            x += indexincrement;
+
+                                            //continue;
+                                        }
+                                        else
+                                        {
+                                            x += indexincrement;
+                                            //continue;
+                                        }
+                                    }
+                                    catch ( Exception ex )
+                                    {
+                                        //Add entry to Error Tuple collection 
+                                        string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                                        Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                                        Program . DebugErrors . Add ( t );
+                                        Debug . WriteLine ( $"\nERROR Program 345 \n{lines [ x ]} : {ex . Message}" );
+                                        TotalExErrors++;
+                                    }
+
+                                    string [ ] tmp = procname [ 1 ] . Trim ( ) . Split ( "," );
+                                    try
+                                    {
                                         for ( int w = 0 ; w < tmp . Length ; w++ )
                                         {
                                             try
@@ -374,131 +458,192 @@ namespace CsharpParser
                                             }
                                             catch ( Exception ex )
                                             {
+                                                //Add entry to Error Tuple collection 
+                                                string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                                                Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                                                Program . DebugErrors . Add ( t );
                                                 Debug . WriteLine ( $"\nERROR Program 364, \n{ex . Message}" );
                                                 TotalExErrors++;
                                             }
                                         }
                                         continue;
                                     }
-                                    else if ( upperlines [ x ] . Contains ( "(" ) )
+                                    catch ( Exception ex )
                                     {
-                                        bool result = true;
-                                        //no commas in line, so either multiple lines or only got (none or one ) arguments
-                                        if ( procname [ 1 ] . Trim ( ) == ")" )
-                                        {
-                                            // got it all on one line, process it
-                                            try
-                                            {
-                                                // no arguments, output full line with 2c/r's
-                                                result = Datastore . AddProcname ( x , $"{procname [ 0 ] . Trim ( )} : [ {pathfilename . Trim ( )} ]" , pathfilename , type , isFname: true );
-                                                if ( result == false )
-                                                {
-                                                    // Handle a duplicate here cos we cannot easily do it in the called procedure
-                                                    Tuple<int , string , string> dbugtuple = Tuple . Create ( 392 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
-                                                    Program . DebugErrors . Add ( dbugtuple );
-                                                    Tuple<int , string , string> tuple = Tuple . Create ( x , path . Trim ( ) , DictResults [ 0 ] . Trim ( ) );
-                                                    ErrorPaths . Add ( tuple );
-                                                }
-                                            }
-                                            catch ( Exception ex )
-                                            {
-                                                //Add entry to Error Tuple collection 
-                                                Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , procname [ 1 ] );
-                                                Program . ErrorPaths . Add ( tuple );
-                                                Debug . WriteLine ( $"\nERROR Program 394, \n{ex . Message}" );
-                                                TotalExErrors++;
-                                            }
-                                            try
-                                            {
-                                                if ( procname [ 1 ] != ")" && procname [ 1 ] != " )" )
-                                                    Datastore . AddProcRow ( x , $"{procname [ 0 ] . Trim ( )} ( )" , pathfilename , type , isAlone: true , crlf: 2 );
-                                                continue;
-                                            }
-                                            catch ( Exception ex )
-                                            {
-                                                //Add entry to Error Tuple collection 
-                                                Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , procname [ 1 ] );
-                                                Program . ErrorPaths . Add ( tuple );
-                                                Debug . WriteLine ( $"\nERROR Program 394, \n{ex . Message}" );
-                                                TotalExErrors++;
-                                            }
-                                        }
-                                        else
-                                        {
-                                            bool result2 = true;
-                                            // no ending ), so must be split over > 1 line - so arguments probably exist.
-                                            //get rest of argumenst and then add procname to list
-                                            string [ ] proclines = new string [ 30 ];
-                                            int indexincrment = ParseAllMethodArgs ( lines , pathfilename , x , ref proclines );
-                                            //reset main index value to cover lines we have read in while processing in the above function
-                                            x += indexincrment;
-                                            try
-                                            {
-                                                //***************************************************************//
-                                                // We now have a string[] with all lines for this method in it.
-                                                // sequence is path, procname, args[].....
-                                                //grab the path + procname out of the top line of our new proclines tuple & remove its trailing "("
-                                                string pname = proclines [ 0 ] . Substring ( 0 , proclines [ 0 ] . Length - 1 );
-                                                //***************************************************************//
-                                                // Add procname to allmethods, then we save the remaining lines of arguments !
-                                                result2 = Datastore . AddProcname ( x , $"{pname} : {pathfilename}" , pathfilename , type , isFname: true , proclines );
-
-                                                if ( result2 == false )
-                                                {
-                                                    // Handle a duplicate or failure here cos we cannot easily do it in theAddProcName() procedure
-                                                    //List<Tuple<int , string , string>> ErrorPaths
-                                                    // Add procname to errors list - OK
-                                                    Tuple<int , string , string> dbugtuple = Tuple . Create ( 443 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
-                                                    Program . DebugErrors . Add ( dbugtuple );
-                                                    Tuple<int , string , string> tuple = Tuple . Create ( x , pathfilename . Trim ( ) , pname . Trim ( ) );
-                                                    ErrorPaths . Add ( tuple );
-                                                }
-                                            }
-                                            catch ( Exception ex )
-                                            {
-                                                // TODO  Fix this problem
-                                                //This is the main error
-                                                Debug . WriteLine ( $"\nERROR Program 441\n {lines [ x ]}, \n{ex . Message}" );
-                                                TotalExErrors++;
-                                                //return;
-                                            }
-                                            // set flag to trigger args block processing
-                                            found = true;
-                                            continue;
-
-                                        }
+                                        //Add entry to Error Tuple collection 
+                                        string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                                        Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                                        Program . DebugErrors . Add ( t );
+                                        Debug . WriteLine ( $"\nERROR Program 294, \n{ex . Message}" ); TotalExErrors++;
                                     }
-                                    else continue;
                                 }
                                 else if ( upperlines [ x ] . Contains ( "(" ) )
                                 {
-                                    string methodname = "";
-                                    try
+                                    indexincrement = 0;
+                                    bool result = true;
+
+                                    Debug . WriteLine ( $" 1 - 392 - {x} lines[x]" );
+                                    File . AppendAllText ( @"C:\wpfmain\documentation\allLines.txt" , $" 392 - {x} {lines [ x ]} \n" );
+                                    //no commas in line, so either multiple lines or only got (none or one ) arguments
+                                    if ( procname [ 1 ] . Trim ( ) == ")" )
                                     {
-                                        // it appears to be spread over more than one line
-                                        methodname = $"{lines [ x ] . Substring ( 0 , lines [ x ] . IndexOf ( "(" ) ) . Trim ( )} (";
-                                        bool result = Datastore . AddProcname ( x , line: lines [ x ] , pathfilename , type );
-                                        if ( result == false )
+                                        // got it all on one line, process it
+                                        try
                                         {
-                                            // Handle a duplicate here cos we cannot easily do it in the called procedure
-                                            //List<Tuple<int , string , string>> ErrorPaths
-                                            Tuple<int , string , string> dbugtuple = Tuple . Create ( 479 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
-                                            Program . DebugErrors . Add ( dbugtuple );
-                                            Tuple<int , string , string> tuple = Tuple . Create ( x , path . Trim ( ) , methodname . Trim ( ) );
-                                            ErrorPaths . Add ( tuple );
+                                            // no arguments, output full line with 2c/r's
+                                            string [ ] proclines = new string [ 1 ];
+                                            indexincrement = ParseAllMethodArgs ( lines , pathfilename , x , ref proclines );
+                                            // TODO  **** THIS AddProcname WORKS*****
+                                            result = Datastore . AddProcname ( x , $"{procname [ 0 ] . Trim ( )} : [ {pathfilename . Trim ( )} ]" , pathfilename , type , isFname: true , fullMethod: proclines );
+                                            if ( result == false )
+                                            {
+                                                // Handle a duplicate here cos we cannot easily do it in the called procedure
+                                                Tuple<int , string , string> dbugtuple = Tuple . Create ( 392 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
+                                                Program . DebugErrors . Add ( dbugtuple );
+                                                Tuple<int , string , string> tuple = Tuple . Create ( x , path . Trim ( ) , DictResults [ 0 ] . Trim ( ) );
+                                                ErrorPaths . Add ( tuple );
+                                                TotalExErrors++;
+                                                x += indexincrement;
+                                                //continue;
+                                            }
+                                            else
+                                            {
+                                                x += indexincrement;
+                                                //continue;
+                                            }
+                                        }
+                                        catch ( Exception ex )
+                                        {
+                                            //Add entry to Error Tuple collection 
+                                            string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                                            Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                                            Program . DebugErrors . Add ( t );
+                                            Debug . WriteLine ( $"\nERROR Program 394, \n{ex . Message}" );
+                                            TotalExErrors++;
+                                            x += indexincrement;
+                                        }
+                                        try
+                                        {
+                                            if ( procname [ 1 ] != ")" && procname [ 1 ] != " )" )
+                                                Datastore . AddProcRow ( x , $"{procname [ 0 ] . Trim ( )} ( )" , pathfilename , type , isAlone: true , crlf: 2 );
+                                            continue;
+                                        }
+                                        catch ( Exception ex )
+                                        {
+                                            //Add entry to Error Tuple collection 
+                                            string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                                            Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                                            Program . DebugErrors . Add ( t );
+                                            Debug . WriteLine ( $"\nERROR Program 394, \n{ex . Message}" );
+                                            TotalExErrors++;
+                                            x += indexincrement;
                                         }
                                     }
-                                    catch ( Exception ex )
+                                    else
                                     {
-                                        Debug . WriteLine ( $"\nERROR Program 473, \n{ex . Message}" );
+                                        bool result2 = true;
+                                        Debug . WriteLine ( $" 1 - 440 - {x} lines[x]" );
+                                        File . AppendAllText ( @"C:\wpfmain\documentation\allLines.txt" , $" 440 - {x} {lines [ x ]} \n" );
+                                        // no ending ), so must be split over > 1 line - so arguments probably exist.
+                                        //get rest of argumenst and then add procname to list
+                                        string [ ] proclines = new string [ 1 ];
+                                        indexincrement = ParseAllMethodArgs ( lines , pathfilename , x , ref proclines );
+                                        //reset main index value to cover lines we have read in while processing in the above function
+                                        try
+                                        {
+                                            //***************************************************************//
+                                            // We now have a string[] with all lines for this method in it.
+                                            // sequence is path, procname, args[].....
+                                            //grab the path + procname out of the top line of our new proclines tuple & remove its trailing "("
+                                            string pname = proclines [ 1 ] . Substring ( 0 , proclines [ 0 ] . Length - 1 );
+                                            //***************************************************************//
+                                            // Add procname to allmethods, then we save the remaining lines of arguments !
+                                            result2 = Datastore . AddProcname ( x , $"{pname} : {pathfilename}" , pathfilename , type , isFname: true , fullMethod: proclines );
+
+                                            if ( result2 == false )
+                                            {
+                                                // Handle a duplicate or failure here cos we cannot easily do it in theAddProcName() procedure
+                                                //List<Tuple<int , string , string>> ErrorPaths
+                                                // Add procname to errors list - OK
+                                                Tuple<int , string , string> dbugtuple = Tuple . Create ( 443 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
+                                                Program . DebugErrors . Add ( dbugtuple );
+                                                Tuple<int , string , string> tuple = Tuple . Create ( x , pathfilename . Trim ( ) , pname . Trim ( ) );
+                                                ErrorPaths . Add ( tuple );
+                                                TotalExErrors++;
+                                                x += indexincrement;
+                                                continue;
+                                            }
+                                            else
+                                            {
+                                                x += indexincrement;
+                                                continue;
+                                            }
+                                        }
+                                        catch ( Exception ex )
+                                        {
+                                            // TODO  Fix this problem
+                                            //This is the main error
+                                            //Add entry to Error Tuple collection 
+                                            string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                                            Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                                            Program . DebugErrors . Add ( t );
+                                            Debug . WriteLine ( $"\nERROR Program 441\n {lines [ x ]}, \n{ex . Message}" );
+                                            TotalExErrors++;
+                                            //return;
+                                        }
+                                        // set flag to trigger args block processing
+                                        found = true;
+                                        continue;
+
+                                    }
+                                }
+                                else continue;
+                            }
+                            else if ( upperlines [ x ] . Contains ( "(" ) )
+                            {
+                                indexincrement = 0;
+                                string methodname = "";
+                                try
+                                {
+                                    string [ ] proclines = new string [ 1 ];
+                                    indexincrement = ParseAllMethodArgs ( lines , pathfilename , x , ref proclines );
+                                    //reset main index value to cover lines we have read in while processing in the above function
+                                    Debug . WriteLine ( $" 1 - 493 - {x} lines[x]" );
+                                    File . AppendAllText ( @"C:\wpfmain\documentation\allLines.txt" , $" 493 - {x} {lines [ x ]} \n" );
+                                    // it appears to be spread over more than one line
+                                    methodname = $"{lines [ x ] . Substring ( 0 , lines [ x ] . IndexOf ( "(" ) ) . Trim ( )} (";
+                                    bool result = Datastore . AddProcname ( x , line: lines [ x ] , pathfilename , type , fullMethod: proclines );
+                                    if ( result == false )
+                                    {
                                         // Handle a duplicate here cos we cannot easily do it in the called procedure
                                         //List<Tuple<int , string , string>> ErrorPaths
+                                        Tuple<int , string , string> dbugtuple = Tuple . Create ( 479 , pathfilename . Trim ( ) , $"Failed to AddProcname\n{lines [ x ]}" );
+                                        Program . DebugErrors . Add ( dbugtuple );
                                         Tuple<int , string , string> tuple = Tuple . Create ( x , path . Trim ( ) , methodname . Trim ( ) );
                                         ErrorPaths . Add ( tuple );
                                         TotalExErrors++;
+                                        x += indexincrement;
+                                        //continue;
                                     }
-                                    continue;
+                                    else
+                                    {
+                                        x += indexincrement;
+                                        //continue;
+                                    }
                                 }
+                                catch ( Exception ex )
+                                {
+                                    Debug . WriteLine ( $"\nERROR Program 473, \n{ex . Message}" );
+                                    // Handle a duplicate here cos we cannot easily do it in the called procedure
+                                    //List<Tuple<int , string , string>> ErrorPaths
+                                    Tuple<int , string , string> tuple = Tuple . Create ( x , path . Trim ( ) , methodname . Trim ( ) );
+                                    Program . DebugErrors . Add ( tuple );
+                                    ErrorPaths . Add ( tuple );
+                                    TotalExErrors++;
+                                    x += indexincrement;
+                                }
+                                continue;
+
                                 try
                                 {
                                     rows = ParselinesFromProcedure ( lines , type , ref x );
@@ -519,6 +664,10 @@ namespace CsharpParser
                                 }
                                 catch ( Exception ex )
                                 {
+                                    //Add entry to Error Tuple collection 
+                                    string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                                    Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                                    Program . DebugErrors . Add ( t );
                                     Debug . WriteLine ( $"Error line 497 {lines [ x ]}\n{ex . Message}" );
                                 }
                                 continue;
@@ -527,16 +676,20 @@ namespace CsharpParser
                     }
                     catch ( Exception ex )  // outer catch()
                     {
+                        //Add entry to Error Tuple collection 
+                        string errnsg = $"\n{ex . Message}\n{lines [ x ]}";
+                        Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errnsg );
+                        Program . DebugErrors . Add ( t );
                         Debug . WriteLine ( $"Oooops : \nERROR Program 504 \n{ex . Message}" );
-                        IsDupe = true;
+                        //                        IsDupe = true;
+                        x += indexincrement;
                     }
                 }
-
                 TotalLines += linescount;
             }
             Console . WriteLine ( $"Completed  - now creating report  files !!!!!" );
             Reporting . DoReporting ( );
-            Reporting.WriteDebugErrors ( );
+            Reporting . WriteDebugErrors ( );
         }
 
         private static int DoIterativeReport ( string fpath )
@@ -614,7 +767,14 @@ namespace CsharpParser
                 }
                 return output;
             }
-            catch ( Exception ex ) { Debug . WriteLine ( "\nERROR Program 565, \n{ex.Message}" ); TotalExErrors++; }
+            catch ( Exception ex )
+            {
+                //Add entry to Error Tuple collection 
+                string errnsg = $"\n{ex . Message}";
+                Tuple<int , string , string> t = Tuple . Create ( -1 , pathfilename , errnsg );
+                Program . DebugErrors . Add ( t );
+                Debug . WriteLine ( "\nERROR Program 565, \n{ex.Message}" ); TotalExErrors++;
+            }
             return output;
         }
 
@@ -656,7 +816,14 @@ namespace CsharpParser
                     return str;
                 }
             }
-            catch ( Exception ex ) { Debug . WriteLine ( "\nERROR Program 607, \n{ex.Message}" ); TotalExErrors++; }
+            catch ( Exception ex )
+            {
+                //Add entry to Error Tuple collection 
+                string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                Program . DebugErrors . Add ( t );
+                Debug . WriteLine ( "\nERROR Program 607, \n{ex.Message}" ); TotalExErrors++;
+            }
             return lines;
         }
 
@@ -713,7 +880,14 @@ namespace CsharpParser
                     }
                 }
             }
-            catch ( Exception ex ) { Debug . WriteLine ( $"oops$ \nERROR Program 664, \n{ex . Message}" ); TotalExErrors++; }
+            catch ( Exception ex )
+            {
+                //Add entry to Error Tuple collection 
+                string errmsg = $"\n{ex . Message}\n{lines [ x ]}";
+                Tuple<int , string , string> t = Tuple . Create ( x , pathfilename , errmsg );
+                Program . DebugErrors . Add ( t );
+                Debug . WriteLine ( $"oops$ \nERROR Program 664, \n{ex . Message}" ); TotalExErrors++;
+            }
             x = index;
             return output;
         }
@@ -774,7 +948,13 @@ namespace CsharpParser
                         }
                     }
                 }
-                catch ( Exception ex ) { Debug . WriteLine ( $"\nERROR Program 724, \n{ex . Message}" ); TotalExErrors++; }
+                catch ( Exception ex )
+                {
+                    //Add entry to Error Tuple collection 
+                    Tuple<int , string , string> t = Tuple . Create ( -1 , pathfilename , $"\n{ex . Message}" );
+                    Program . DebugErrors . Add ( t );
+                    Debug . WriteLine ( $"\nERROR Program 724, \n{ex . Message}" ); TotalExErrors++;
+                }
 
                 // Now find all the subdirectories under this directory.
                 subDirs = root . GetDirectories ( );
@@ -884,48 +1064,85 @@ namespace CsharpParser
         }
         public static int ParseAllMethodArgs ( string [ ] lines , string filepathname , int x , ref string [ ] proclines )
         {
-            string arglines = "", buffer = "";
-            int ndx = 0, outndx = 0;
+            // Parse all the arguments  into a string[] array in proclines[]
+            string arglines = "", buffer = "", inputstring = "";
+            int ndx = 0, outndx = 0, count = 0;
             string [ ] parts2;
-            string [ ] outbuff = new string [ 30 ]; ;
+            List<string> inbuff = new ( ); ;
+            List<string> outbuff = new ( );
             bool isfirst = true, breakout = false;
 
+            inbuff . Add ( filepathname );
             while ( true )
             {
                 //read lines in until we have the complete set of arguments
-                string s = lines [ x + ndx++ ] . Trim ( );
-                if ( isfirst )
-                    parts2 = s . Split ( "(" );
-                else
-                    parts2 = s . Split ( "," );
-                for ( int z = 0 ; z < parts2 . Length ; z++ )
-                {
-                    if ( isfirst )
-                    {
-                        // add filepathname  1st
-                        outbuff [ outndx++ ] += $"{filepathname}";
-                        if ( z == 0 && parts2 [ z ] . Trim ( ) . Contains ( "(" ) == false )
-                            outbuff [ outndx++ ] = $"{parts2 [ z ] . Trim ( )}(";
-                        else
-                            outbuff [ outndx++ ] = $"{parts2 [ z ] . Trim ( )}";
-                    }
-                    else
-                        outbuff [ outndx++ ] = $"{parts2 [ z ] . Trim ( )}";
-                    isfirst = false;
-                }
-
-                if ( outbuff [ outndx - 1 ] . Trim ( ) . EndsWith ( ")" ) )
+                count++;
+                inputstring = lines [ x + ndx++ ] . Trim ( );
+                if ( inputstring . Trim ( ) . StartsWith ( "{" ) )
+                {   // we have moved PAST the procedure declaration somehow.
                     break;
-            }
-            // create string[] the correct size to return to caller
-            proclines = new string [ outndx ];
+                }
+                //Is it a one liner ?
+                if ( inputstring . Trim ( ) . Contains ( "(" ) && ( inputstring . Trim ( ) . Contains ( ")" ) ) )
+                {
+                    // its a one liner
+                    int offset = inputstring . IndexOf ( "(" );
+                    //Add procedure name to buffer
+                    inbuff . Add ( inputstring . Substring ( 0 , offset + 1 ) );
+                    //just leave anyhing else in the buffer
+                    arglines = inputstring . Substring ( offset + 1 );
 
-            for ( int z = 0 ; z < outndx ; z++ )
+                    if ( arglines . Trim ( ) . Contains ( ")" ) )
+                    {   //YES
+                        if ( arglines . Trim ( ) . Contains ( "," ) == false )
+                        {   // only a single arg at most - Add ending ) to output of procedure name
+                            inbuff [ inbuff . Count - 1 ] += ")";
+                            break;
+                        }
+                        else
+                        {
+                            //offset = arglines . IndexOf ( "(" );
+                            ////Add procedure name to list
+                            //inbuff . Add ( arglines . Substring ( offset - 1 ) );
+                            //arglines = arglines . Substring ( offset + 1 );
+                            //if ( arglines . Contains ( "," ) == false )
+                            //{
+                            //    // it's a one liner (but with >1 args) -parse and  add  to list and exit
+                            //    parts2 = arglines . Split ( "," );
+                            //    break; ; ;
+                            //}
+                            //else
+                            //{
+                            //got more than 1 argument on this line - split  em up
+                            parts2 = arglines . Split ( "," );
+                            try
+                            {
+                                for ( int p = 0 ; p < parts2 . Length ; p++ )
+                                {
+                                    if ( parts2 [ p ] == null || parts2 [ p ] == "" )
+                                        break;
+                                    //if ( parts2 [ p ] . Contains ( ")" ) )
+                                    //    inbuff . Add ( parts2[p] );
+                                    else
+                                        inbuff . Add ( parts2 [ p ] );
+                                }
+                                break;
+                            }
+                            catch ( Exception ex ) { x = x; }
+                        }
+                        continue;
+                    }
+                }
+            }
+            // add 1 for filename line
+            proclines = new string [ inbuff . Count ];
+            //proclines [ 0 ] = filepathname;
+
+            for ( int y = 0 ; y < inbuff . Count ; y++ )
             {
-                proclines [ z ] = outbuff [ z ] . Trim ( );
+                proclines [ y ] = inbuff [ y ];
             }
-            return ndx;
+            return inbuff . Count;
         }
-
     }
 }

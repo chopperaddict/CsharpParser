@@ -32,7 +32,7 @@ namespace CsharpParser
                 Tuple<int , string , string> [ ] tuples = new Tuple<int , string , string> [ Program . ErrorPaths . Count ];
 
                 // Add current source file to top of list
-                foreach ( Tuple<int , string , string> item in Program . ErrorPaths )
+                foreach ( Tuple<int , string , string> item in  Program . ErrorPaths )
                 {
                     Tuple<int , string , string> currenttuple = Tuple . Create ( item . Item1 , item . Item2 , item . Item3 );
                     List<Tuple<int , string , string>> matches = Utilities . FindAllDupeMatches ( ErrorPaths: Program . ErrorPaths , currenttuple );
@@ -54,13 +54,9 @@ namespace CsharpParser
                 }
             }
             File . WriteAllText ( $@"C:\wpfmain\Documentation\Duplicateslist.txt" , sbMethods . ToString ( ) );
-            
+
             // TODO   output   to cmd window ????
-           // Utilities . SortDupes ( Program . ErrorPaths );
-
-
-
-
+            // Utilities . SortDupes ( //Program . ErrorPaths );
         }
         public static void CreateReports ( )
         {
@@ -74,7 +70,7 @@ namespace CsharpParser
             //**********************************//
             // Create  file ALLMETHODS.TXT
             //**********************************//
-            
+
             // TODO not working 8/3/23
 
             //Program . path = @"C:\wpfmain\Documentation\AllMethods.txt";
@@ -105,7 +101,7 @@ namespace CsharpParser
             // Now create file @"C:\Wpfmain\Documentation\MethodsIndex.txt"
             // data comes from the AllMethods Dictionary entries captured here.
             //==========================================//
-            
+
             // TODO - not working  8/3/23
             //CreateDupesFile ( );
         }
@@ -179,55 +175,93 @@ namespace CsharpParser
         {
             // TODO WORKING Quite Well !! 8//34/23
             string path = @"C:\wpfmain\documentation\AllTuples.txt";
+            string sarg = "";
+            int linecount = 1;
             Program . TotalMethods = 0;
             File . WriteAllText ( path , "" );
 
-            foreach ( Tuple<int , string , string , string [ ]> item in Program . Alltuples )
+            foreach ( Tuple<int , string , string , string [ ]> item in Program.AllTupesList)
             {
                 if ( item == null )
                     break;
+                Tuple<int , string , string , string [ ]>  AllTuples = item;
+                Debug . Assert ( AllTuples . Item4 [ 0 ] != "GetBankAccounts" , "GetBankAccounts identified" , "did it work ?" );
                 Program . TotalMethods++;
-                string entry = $"\n{item . Item3} : {item . Item1}\n";  // file name + line #
-                File . AppendAllText ( path , entry );
-                int max = item . Item4 . Length;
-                if ( max == 1 )
-                {
-                    // only one argument
-                    File . AppendAllText ( path , $"\t{item . Item2} (" );   // proc name
-                    if ( item . Item4 [ 0 ] ==""  )
-                        File . AppendAllText ( path , $");\n" );   // proc name
-                    else
-                        File . AppendAllText ( path , $"\n   \t{item . Item4 [ 0 ]} );\n" );   // proc name
-                    continue;
-                }
-                File . AppendAllText ( path , $"  {item . Item2}" );   // proc name
-                for ( int z = 0 ; z < max ; z++ )
-                {
-                    //----------------------------------------------------------------------------------------//
-                    string asserter = "public static int FindMatchingIndex";
-     //               Debug . Assert ( item.Item4[z] != asserter );
-                    //----------------------------------------------------------------------------------------//
+                // layout required :
+                // Filepath : line# = Item3 : Item1
+                // procname         = Item2
+                // Args ....                = Item4[]
+                // \n
+                // so sequence is :
+                // Filename : Lineno
+                // procname
+                // args....
 
-                    string sarg = item . Item4 [ z ];
-                    if ( z == max-1 )
+                string Lineno = $"{AllTuples . Item1}";  // line #
+                string Filename = $"{AllTuples . Item3}";    // Source file name
+                string FilenameLine = $"\n({linecount++}) Ln# {AllTuples . Item1} : {AllTuples . Item3}";  // file name + line #
+                int argscount = 0, count=0;
+                string [ ] args =new string [ 1 ];
+                string Procname = $"{AllTuples . Item4 [ 0 ]});";// procedure name (from Item4[0])
+                for(int x = 0 ; x < AllTuples . Item4 .Length ; x++ )
+                {
+                    if ( AllTuples . Item4 [x] != null )
+                        argscount++;
+                    else break;
+                }
+
+                if ( argscount == 1 )
+                {   //No arguments
+                    if ( AllTuples . Item4 [ 0 ] . Trim ( ) . Contains ( ",") == false )
+                        Procname = $"{AllTuples . Item4 [ 0 ]});";// procedure name (from Item4[0])
+                    else
                     {
-                        File . AppendAllText ( path , $"\n\t  {sarg} );\n" );   // No arguments
-                        continue;
+                        string[] argtmp = AllTuples . Item4 [ 0 ] . Split ( "," );
+                        count = 0;
+                        argscount = argtmp . Length;
+                        args = new string [ argscount ];  
+                       for(int y = 0 ; y < argscount ; y++ )
+                        {
+                            args [ y ] = argtmp [ y ];
+                        }
                     }
-                    //File . AppendAllText ( path , $"\n\t  {sarg}" );   // arguments
-                    if ( z == max - 1 )
-                        File . AppendAllText ( path , $"\n{sarg})\n" );   // arguments
-                    else
-                        File . AppendAllText ( path , $"\n\t  {sarg}," );   // arguments
                 }
+                else
+                {   // 1 or more arguments ?
+                    if ( argscount >= 2 )
+                    {
+                        // Load all args into an array and  format them
+                        args = new string [ argscount ];
+                        for ( int p = 0 ; p < argscount ; p++ )
+                        {
+                            if ( AllTuples . Item4 [ p ] == null )
+                                break;
+                            if ( AllTuples . Item4 [ 0 ] . Trim ( ) . EndsWith ( "(" ) == false )
+                                args [ 0 ] = AllTuples . Item4 [ 0 ] + "(\n";        // output FULL line
+                            else
+                            args [ p  ] = AllTuples . Item4 [ p ];
+                        }
+                        if ( args [ argscount-1 ] . Trim ( ) . EndsWith ( ")" ) == false )
+                            args [ argscount - 1 ] += ");";
+                    }
+                }
+                File . AppendAllText ( path , $"{FilenameLine}\n" );
+                File . AppendAllText ( path , $"  {Procname}\n" );
 
+                for ( int t = 0 ; t < argscount ; t++ )
+                {
+                    if ( t < argscount - 1 )
+                        File . AppendAllText ( path , $"    {args [ t ]},\n" );
+                    else
+                        File . AppendAllText ( path , $"    {args [ t ]});\n" );
+                }
             }
-            File . AppendAllText ( path , $"\nE.O.F : Created : {DateTime.Now}" );   // arguments
+            File . AppendAllText ( path , $"\nE.O.F : Created : {DateTime . Now}" );   // arguments
             string tmp = File . ReadAllText ( path );
             File . WriteAllText ( path , $"Report of all Procedures identified in the Directory [{Program . searchpath}] + it's subdirectories.\n\n"
-                + $"A Total of {Program . TotalFiles} files have been examined and processed, resulting in\n"
-                + $"a Total #({Program . TotalMethods}) Methods being identiified. A total of {Program.TotalExErrors} (Unhandled Errors were encountered  during processing...\nThe resulting details are shown below :-\nReport  created {DateTime . Now}\n"
-                + $"====================================================================================\n\n" );
+                    + $"A Total of {Program . TotalFiles} files have been examined and processed, resulting in\n"
+                    + $"a Total #({Program . TotalMethods}) Methods being identiified. A total of {Program . TotalExErrors} (Unhandled Errors were encountered  during processing...\nThe resulting details are shown below :-\nReport  created {DateTime . Now}\n"
+                    + $"====================================================================================\n\n" );
             File . AppendAllText ( path , tmp );   // arguments
 
             //CreatefullReportFile ( );
@@ -261,7 +295,7 @@ namespace CsharpParser
                 if ( proc . Contains ( "(" ) == true && proc . Contains ( ")" ) == true
                     || proc . Contains ( "(" ) == true && proc . Contains ( ")" ) == false )
                 {
-                    // output the file namme and line #
+                    // output the file name and line #
                     output += $"\n{spath} : #{line}\n";
                     File . WriteAllText ( path , output );
                     Program . TotalMethods++;
@@ -385,15 +419,15 @@ namespace CsharpParser
 
             // TODO working - SORT OF 8/3/23
             if ( File . Exists ( $@"C:\wpfmain\documentation\AllDebugErrors.txt" ) )
-                File . WriteAllText ( $@"C:\wpfmain\documentation\AllOutput.txt" ,"");
+                File . WriteAllText ( $@"C:\wpfmain\documentation\AllOutput.txt" , "" );
             // now create header for the file
-                string str2 = $"{Program . underline}\nCsharpParser.EXE has encountered the  following errors .\nProceessed on  {DateTime . Now . ToString ( )}\n{Program . underline}\n\n";
+            string str2 = $"{Program . underline}\nCsharpParser.EXE has encountered the  following errors .\nProceessed on  {DateTime . Now . ToString ( )}\n{Program . underline}\n\n";
             //write it all out again, header first.
-            foreach (  Tuple<int,string,string> item in Program.DebugErrors)
+            foreach ( Tuple<int , string , string> item in Program . DebugErrors )
             {
-            File . AppendAllText ( $@"C:\wpfmain\documentation\AllDebugErrors.txt" , $"{item.Item1}\n{item.Item2}\n{item.Item3}\n\n");
+                File . AppendAllText ( $@"C:\wpfmain\documentation\AllDebugErrors.txt" , $"{item . Item1}\n{item . Item2}\n{item . Item3}\n\n" );
             }
-            
+
 
         }
     }
