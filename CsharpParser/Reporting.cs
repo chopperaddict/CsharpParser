@@ -174,9 +174,19 @@ namespace CsharpParser
         public static void CreateAllLIstTuplesReport ( )
         {
             // TODO WORKING Quite Well !! 8//34/23
+            // layout required :
+            // Filepath : line# = Item3 : Item1
+            // procname         = Item2
+            // Args ....                = Item4[]
+            // \n
+            // so sequence is :
+            // Filename : Lineno
+            // procname
+            // args....
+
             string path = @"C:\wpfmain\documentation\AllTuples.txt";
-            string sarg = "";
-            int linecount = 1;
+            int procline = 1;
+            int argscount = 0;
             Program . TotalMethods = 0;
             File . WriteAllText ( path , "" );
 
@@ -184,109 +194,64 @@ namespace CsharpParser
             {
                 if ( item == null )
                     break;
-                Tuple<int , string , string , string [ ]> AllTuples = item;
-                Debug . Assert ( AllTuples . Item4 [ 0 ] != "GetBankAccounts" , "GetBankAccounts identified" , "did it work ?" );
-                Program . TotalMethods++;
-                // layout required :
-                // Filepath : line# = Item3 : Item1
-                // procname         = Item2
-                // Args ....                = Item4[]
-                // \n
-                // so sequence is :
-                // Filename : Lineno
-                // procname
-                // args....
 
-                string Lineno = $"{AllTuples . Item1}";  // line #
-                string Filename = $"{AllTuples . Item3}";    // Source file name
-                string FilenameLine = $"\n({linecount++}) Ln# {AllTuples . Item1} : {AllTuples . Item3}";  // file name + line #
-                int argscount = 0, count = 0;
-                string [ ] args = new string [ 1 ];
-                string Procname = $"{AllTuples . Item4 [ 0 ]});";// procedure name (from Item4[0])
-                Debug . Assert ( Procname .Contains ( "GetBankDataAsObsCollectionAsync")==false ,"","");
-  
-                // ensure we have the correct count of arguments
+                Tuple<int , string , string , string [ ]> AllTuples = item;
+
                 for ( int x = 0 ; x < AllTuples . Item4 . Length ; x++ )
                 {
-                    if ( AllTuples . Item4 [ x ] != null )
+                        if ( AllTuples . Item4 [ x ] != null )
                         argscount++;
                     else break;
                 }
-                if ( argscount == 1 )
-                {   //No arguments
-                    if ( AllTuples . Item4 [ 0 ] . Trim ( ) . Contains ( "," ) == false )
-                        Procname = $"{AllTuples . Item4 [ 0 ]});";// procedure name (from Item4[0])
-                    else
-                    {
-                        string [ ] argtmp = AllTuples . Item4 [ 0 ] . Split ( "," );
-                        count = 0;
-                        argscount = argtmp . Length;
-                        args = new string [ argscount ];
-                        for ( int y = 0 ; y < argscount ; y++ )
-                        {
-                            args [ y ] = argtmp [ y ];
-                        }
-                    }
-                }
-                else
-                {   // 1 or more arguments ?
-                    if ( argscount >= 2 )
-                    {
-                        // Load all args into an array and  format them
-                        args = new string [ argscount ];
-                        for ( int p = 0 ; p < argscount ; p++ )
-                        {
-                            if ( AllTuples . Item4 [ p ] == null )
-                                break;
-                            if ( AllTuples . Item4 [ 0 ] . Trim ( ) . EndsWith ( "(" ) == false )
-                                args [ 0 ] = AllTuples . Item4 [ 0 ] + "(\n";        // output FULL line
-                            else
-                                args [ p ] = AllTuples . Item4 [ p ];
-                        }
-                        if ( args [ argscount - 1 ] . Trim ( ) . EndsWith ( ")" ) == false )
-                            args [ argscount - 1 ] += ");";
-                    }
-                }
-                Debug . Assert ( Procname . Contains ( "public static async Task<ObservableCollection<BankAccountViewModel>> GetBankDataAsObsCollectionAsync ()")== false , "" , "" );
-                File . AppendAllText ( path , $"\n{FilenameLine . Trim ( )}\n" );
+                if ( Program . SHOWASSERT )
+                    Debug . Assert ( AllTuples . Item4 [ 0 ] != "GetBankAccounts" , "GetBankAccounts identified" , "did it work ?" );
+                Program . TotalMethods++;
 
-                for ( int t = 0 ; t < argscount ; t++ )
+                string Lineno = $"{AllTuples . Item1}";  // line #
+                string Filename = $"{AllTuples . Item3}";    // Source file name
+                string FilenameLine = $"\n({procline++}) Ln# {AllTuples . Item1} : {AllTuples . Item3}";  // file name + line #
+                string Procname = $"{AllTuples . Item4 [ 2 ]});";// procedure name (from Item4[0])
+                if ( Program . SHOWASSERT )
+                    Debug . Assert ( Procname . Contains ( "GetBankDataAsObsCollectionAsync" ) == false , "" , "" );
+
+                File . AppendAllText ( path , $"{FilenameLine}\n" );
+                for ( int x = 2 ; x < item . Item4 . Length ; x++ )
                 {
-                    if ( t < argscount - 1 )
+                    if ( AllTuples . Item4 . Length == 4 )
                     {
-                        if ( args [ t ] == null )
-                            continue;
-                        if ( t == 0 )
-                            File . AppendAllText ( path , $"    {args [ t ]}\n" );
-                        else
-                            File . AppendAllText ( path , $"    {args [ t ] . Trim ( )},\n" );
+                        File . AppendAllText ( path , $"    {item . Item4 [ 2 ]});\n" );
+                        break;
                     }
 
+                    if (  x == item . Item4 . Length - 1 )
+                        File . AppendAllText ( path , $"    {item . Item4 [ x ]};\n" );
+                    else if(x == 2)
+                        File . AppendAllText ( path , $"    {item . Item4 [ x ]}\n" );
                     else
-                    {
-                        if ( args [ t ] == null )
-                            continue;
-                        if ( args [t].Trim().EndsWith(")") == false)
-                            File . AppendAllText ( path , $"    {args [ t ].Trim()});\n" );
-                        else
-                            File . AppendAllText ( path , $"    {args [ t ] . Trim ( )};\n" );
-                    }
+                        File . AppendAllText ( path , $"    {item . Item4 [ x ]},\n" );
                 }
             }
             File . AppendAllText ( path , $"\nE.O.F : Created : {DateTime . Now}" );   // arguments
             string tmp = File . ReadAllText ( path );
-            File . WriteAllText ( path , $"Report of all Procedures identified in the Directory [{Program . searchpath}] + it's subdirectories.\n\n"
+            File . WriteAllText ( path , "");
+            if(Program.SHOWONLY != "")
+                File . WriteAllText ( path , $"Report of all Procedures , Filtered on [{Program.SHOWONLY} ONLY] \nthat have been identified in the Directory [{Program . searchpath}] + it's subdirectories.\n\n"
+                        + $"A Total of {Program . TotalFiles} files have been examined and processed, resulting in\n"
+                        + $"a Total #({Program . TotalMethods}) {Program.SHOWONLY} Methods have been successfully identified.\nThere were {Program . TotalExErrors} (Unhandled Errors  encountered during processing...\n\nThe Procedures/Methods identified are shown below :-\nReport  created {DateTime . Now}\n"
+                        + $"====================================================================================\n\n" );
+            else
+                File . WriteAllText ( path , $"Report of all Procedures identified in the Directory [{Program . searchpath}] + it's subdirectories.\n\n"
                     + $"A Total of {Program . TotalFiles} files have been examined and processed, resulting in\n"
-                    + $"a Total #({Program . TotalMethods}) Methods being identiified. A total of {Program . TotalExErrors} (Unhandled Errors were encountered  during processing...\nThe resulting details are shown below :-\nReport  created {DateTime . Now}\n"
+                    + $"a Total #({Program . TotalMethods}) Methods have been successfully identified.\nA total of {Program . TotalExErrors} (Unhandled Errors were encountered during processing...\nThe Procedures/Methods identified are shown below :-\nReport  created {DateTime . Now}\n"
                     + $"====================================================================================\n\n" );
             File . AppendAllText ( path , tmp );   // arguments
-
-            //CreatefullReportFile ( );
+           //CreatefullReportFile ( );
         }
         public static void CreatefullReportFile ( )
         {
+
             //***************************************//
-            // This is   the MAIN ALLTUPLES report
+            // This is  the MAIN ALLTUPLES report
             //***************************************//
             //string path = @"C:\wpfmain\documentation\AllTuples.txt";
             //string dt = File . ReadAllText ( path );

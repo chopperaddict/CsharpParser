@@ -23,6 +23,19 @@ namespace CsharpParser
             //output += name == null ? " No member name" : $"( {name} )";
             //Debug . WriteLine ( $"{line} : {output}\n" );
         }
-
+        public static string flines (
+           this string data ,
+           [CallerLineNumber] int line = -1 ,
+           //[CallerFilePath] string path = null ,
+         
+           [CallerMemberName] string name = null )
+        {
+            string output = "";
+            return $"{data} : Ln {line} : {name}\n";
+            //output = line < 0 ? "No line  : " : "Line " + $"{line} : ";
+            //output += path == null ? "No file path" : $"\t{path}  : ";
+            //output += name == null ? " No member name" : $"( {name} )";
+            //Debug . WriteLine ( $"{line} : {output}\n" );
+        }
     }
 }
